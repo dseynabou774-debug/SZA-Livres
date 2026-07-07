@@ -1,89 +1,53 @@
-/* =====================================================================
-   SERVICE WORKER — Seyda Zeynab Academy — Paiements
-   Objectif : rendre l'application 100% utilisable hors ligne après le
-   tout premier chargement (mise en cache de l'app + des bibliothèques).
-===================================================================== */
-
-const CACHE_NAME = "sza-paiements-cache-v1";
-
-// Fichiers de l'application (même origine)
-const APP_ASSETS = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/apple-touch-icon.png",
-  "./icons/favicon-32.png"
+const CACHE_NAME = 'sza-livres-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './css/style.css',
+  './js/db.js',
+  './js/utils.js',
+  './js/pages.js',
+  './js/pages2.js',
+  './js/app.js',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/logo.png'
 ];
 
-// Bibliothèques externes utilisées par l'app (mises en cache si disponibles)
-const CDN_ASSETS = [
-  "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Amiri:wght@400;700&display=swap",
-  "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
-];
-
-/* ---------------- INSTALLATION : mise en cache initiale ---------------- */
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      // Les fichiers de l'app doivent réussir
-      await cache.addAll(APP_ASSETS);
-      // Les fichiers CDN sont mis en cache un par un : si l'un échoue
-      // (pas de réseau au moment de l'installation), on ignore l'erreur
-      // pour ne pas bloquer l'installation du service worker.
-      await Promise.all(
-        CDN_ASSETS.map((url) =>
-          fetch(url, { mode: "cors" })
-            .then((res) => cache.put(url, res))
-            .catch(() => null)
-        )
-      );
-    })
-  );
+// Install: pre-cache app shell
+self.addEventListener('install', (event) => {
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+  );
 });
 
-/* ---------------- ACTIVATION : nettoyage des anciens caches ---------------- */
-self.addEventListener("activate", (event) => {
+// Activate: clean old caches
+self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      )
-    )
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-/* ---------------- FETCH : stratégie "cache d'abord, réseau ensuite" ---------------- */
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+// Fetch: cache-first for app shell, network-first fallback to cache for others
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(event.request)
-        .then((response) => {
-          // On met en cache la nouvelle ressource pour un usage hors ligne futur
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            try { cache.put(event.request, copy); } catch (e) {}
-          });
-          return response;
-        })
-        .catch(() => {
-          // Hors ligne et pas en cache : on retombe sur la page principale
-          // pour éviter un écran blanc (utile pour la navigation).
-          if (event.request.mode === "navigate") {
-            return caches.match("./index.html");
+    caches.match(req).then((cached) => {
+      const fetchPromise = fetch(req)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && req.url.startsWith(self.location.origin)) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
           }
-        });
+          return networkResponse;
+        })
+        .catch(() => cached);
+      return cached || fetchPromise;
     })
   );
 });
