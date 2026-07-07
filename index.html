@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Gestion des Livres – Seyda Zeynab Academy</title>
+<meta name="description" content="Application de gestion du stock, des ventes, des clients et des bénéfices des livres de Seyda Zeynab Academy" />
+<meta name="theme-color" content="#1D3823" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Livres SZA" />
+<link rel="stylesheet" href="style.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+</head>
+<body>
+
+<div id="lock-screen" class="lock-screen hidden">
+  <div class="brand-mark"><img src="logo.png" alt="Seyda Zeynab Academy"></div>
+  <h1>Seyda Zeynab Academy</h1>
+  <p id="lock-sub">Gestion des Livres — Entrez votre mot de passe</p>
+  <div class="lock-error" id="lock-error"></div>
+  <input type="password" id="lock-input" inputmode="numeric" placeholder="••••" maxlength="12" />
+  <button class="btn btn-gold" id="lock-btn">Déverrouiller</button>
+</div>
+
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><img src="logo.png" alt="Seyda Zeynab Academy"></div>
+      <div>
+        <h1 id="topbar-title">Gestion des Livres</h1>
+        <span class="sub">Seyda Zeynab Academy</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="icon-btn" id="btn-lock" title="Verrouiller">🔒</button>
+      <button class="icon-btn" id="btn-install" title="Installer l'application">⬇️</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <nav id="side-nav"></nav>
+    </aside>
+
+    <main class="main" id="main-content"></main>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+  <button class="fab hidden" id="fab-add">+</button>
+</div>
+
+<div id="toast-wrap" class="toast-wrap"></div>
+<div id="modal-root"></div>
+
+<script src="db.js"></script>
+<script src="utils.js"></script>
+<script src="pages.js"></script>
+<script src="pages2.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
