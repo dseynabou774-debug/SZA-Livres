@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Écoute Audio - Seyda Zeynab</title>
+<style>
+  body { font-family: sans-serif; background:#0d3b2e; color:#f5e9c9; text-align:center; padding:40px 20px; }
+  h2 { color:#f5e9c9; }
+  audio { width:100%; margin-top:20px; }
+  #msg { margin-top:20px; color:#e0c88a; }
+  .warn { font-size:13px; color:#c9a86a; margin-top:30px; }
+</style>
+</head>
+<body>
+  <h2 id="titre">Chargement...</h2>
+  <audio id="player" controls controlsList="nodownload noplaybackrate" oncontextmenu="return false;"></audio>
+  <p id="msg"></p>
+  <p class="warn">🔒 Cet audio est lié à votre achat personnel et ne doit pas être partagé.</p>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const token = params.get('token');
+const EDGE_FUNCTION_URL = "https://tpivirycaomrgfjzhoel.supabase.co/functions/v1/get-audio-url";
+
+async function chargerAudio() {
+  if (!token) {
+    document.getElementById('msg').textContent = "Lien invalide.";
+    return;
+  }
+  try {
+    const res = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: token })
+    });
+    const data = await res.json();
+    if (data.error) {
+      document.getElementById('titre').textContent = "Accès refusé";
+      document.getElementById('msg').textContent = data.error;
+      return;
+    }
+    document.getElementById('titre').textContent = data.title;
+    document.getElementById('player').src = data.url;
+  } catch (e) {
+    document.getElementById('msg').textContent = "Erreur de connexion.";
+  }
+}
+chargerAudio();
+</script>
+</body>
+</html>
