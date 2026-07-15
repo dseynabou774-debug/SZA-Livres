@@ -3,6 +3,12 @@
 --------------------------------------------------------- */
 const Audiobooks = {};
 
+Audiobooks.listAll = async function () {
+  const { data, error } = await sb.from('audio_products').select('*').order('title');
+  if (error) { Utils.toast('Erreur chargement audios : ' + error.message, 'err'); return []; }
+  return data || [];
+};
+
 Audiobooks.getInfo = async function (audioId) {
   const { data, error } = await sb.from('audio_products').select('*').eq('id', audioId).single();
   if (error) return null;
