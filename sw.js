@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sza-livres-v4';
+const CACHE_NAME = 'sza-livres-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const ASSETS = [
   './style.css',
   './db.js',
   './utils.js',
+  './files.js',
   './pages.js',
   './pages2.js',
   './app.js',
@@ -40,7 +41,10 @@ self.addEventListener('fetch', (event) => {
     caches.match(req).then((cached) => {
       const fetchPromise = fetch(req)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && req.url.startsWith(self.location.origin)) {
+          const sameOrigin = req.url.startsWith(self.location.origin);
+          // Les bibliothèques externes (PDF, QR code, polices) sont aussi gardées pour le mode hors-ligne
+          const cdn = /^https:\/\/(cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)\//.test(req.url);
+          if (networkResponse && ((sameOrigin && networkResponse.status === 200) || (cdn && (networkResponse.status === 200 || networkResponse.type === 'opaque')))) {
             const clone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
           }

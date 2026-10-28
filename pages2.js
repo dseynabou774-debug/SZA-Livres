@@ -313,10 +313,121 @@ Pages.receipt = function (id) {
       <button class="btn btn-outline btn-sm" onclick="Pages.copyReceipt('${s.id}')">📋 Copier</button>
       <button class="btn btn-gold btn-sm" onclick="Pages.shareReceiptWhatsApp('${s.id}')">📲 WhatsApp</button>
     </div>
+    ${Pages.deliverySection(s)}
     <div class="receipt-actions" style="grid-template-columns:1fr">
       <button class="btn btn-danger btn-sm" onclick="Pages.removeSale('${s.id}')">🗑 Supprimer ce reçu / cette vente</button>
     </div>
   `;
+};
+
+/* ---------------------------------------------------------
+   LIVRAISON DES E-BOOKS (PDF filigrané + audio via WhatsApp)
+--------------------------------------------------------- */
+Pages.deliverySection = function (s) {
+  const seen = {};
+  const books = s.items
+    .map(it => DB.getBook(it.bookId))
+    .filter(b => b && b.type === 'ebook' && !seen[b.id] && (seen[b.id] = true));
+  if (!books.length) return '';
+  const paid = s.status === 'Payé';
+  const deliveries = s.deliveries || [];
+
+  const rows = books.map(b => {
+    const sentPdf = deliveries.filter(d => d.bookId === b.id && d.kind === 'pdf').length;
+    const sentAudio = deliveries.filter(d => d.bookId === b.id && d.kind === 'audio').length;
+    let actions;
+    if (!paid) {
+      actions = `<div class="text-muted" style="font-size:.8rem">🔒 Livraison disponible dès que le paiement est complet.</div>`;
+    } else if (b.filesEnabled === false) {
+      actions = `<div class="text-muted" style="font-size:.8rem">🚫 Livraison désactivée pour cet e-book (voir sa fiche).</div>`;
+    } else if (!b.pdfName && !b.audioName) {
+      actions = `<div class="text-muted" style="font-size:.8rem">Aucun fichier importé. Ajoutez le PDF dans la fiche de l'e-book.</div>`;
+    } else {
+      actions = `<div class="tag-row">
+        ${b.pdfName ? `<button class="btn btn-primary btn-sm" onclick="Pages.sendEbook('${s.id}','${b.id}','pdf')">📄 PDF filigrané</button>` : ''}
+        ${b.audioName ? `<button class="btn btn-gold btn-sm" onclick="Pages.sendEbook('${s.id}','${b.id}','audio')">🎧 Audio</button>` : ''}
+      </div>`;
+    }
+    const sentLine = (sentPdf || sentAudio)
+      ? `<div style="font-size:.74rem;color:var(--ok)">✅ Déjà envoyé : ${sentPdf ? sentPdf + ' PDF' : ''}${sentPdf && sentAudio ? ' · ' : ''}${sentAudio ? sentAudio + ' audio' : ''}</div>` : '';
+    return `<div class="list-item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div class="title">💻 ${Utils.escapeHtml(b.title)}</div>${sentLine}${actions}</div>`;
+  }).join('');
+
+  return `
+    <div class="section-block mt-16">
+      <h3>📤 Livraison des e-books</h3>
+      <div class="list">${rows}</div>
+      <div class="text-muted" style="font-size:.72rem;margin-top:8px">Le PDF est personnalisé (nom, téléphone et n° de reçu du client en filigrane sur chaque page) puis envoyé directement sur WhatsApp, sans lien.</div>
+    </div>`;
+};
+
+Pages.sendEbook = async function (saleId, bookId, kind) {
+  Utils.toast(kind === 'pdf' ? 'Préparation du PDF filigrané…' : "Préparation de l'audio…");
+  try {
+    const file = await Delivery.prepare(saleId, bookId, kind);
+    Delivery.ready = { file, saleId, bookId, kind };
+    const sale = DB.getSale(saleId);
+    const book = DB.getBook(bookId);
+    const client = DB.getClient(sale.clientId);
+    Utils.openModal(`
+      <div class="modal-header"><h3>${kind === 'pdf' ? '📄 PDF prêt' : '🎧 Audio prêt'}</h3><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+      <div class="card mb-8">
+        <div class="stock-row"><span class="text-muted">E-book</span><strong>${Utils.escapeHtml(book.title)}</strong></div>
+        <div class="stock-row"><span class="text-muted">Client</span><strong>${client ? Utils.escapeHtml(client.name) : '—'}</strong></div>
+        <div class="stock-row"><span class="text-muted">Téléphone</span><strong>${client ? Utils.escapeHtml(client.phone || '—') : '—'}</strong></div>
+        <div class="stock-row"><span class="text-muted">Fichier</span><strong>${Utils.escapeHtml(file.name)} (${Pages.fmtSize(file.size)})</strong></div>
+        ${kind === 'pdf' ? '<div class="text-muted mt-8" style="font-size:.76rem">🔖 Filigrane ajouté sur chaque page : nom, téléphone, n° de reçu.</div>' : ''}
+      </div>
+      <button class="btn btn-primary btn-block" onclick="Pages.shareReady()">📲 Envoyer sur WhatsApp</button>
+      <button class="btn btn-outline btn-block mt-8" onclick="Pages.saveReady()">⬇️ Enregistrer sur l'appareil</button>
+    `);
+  } catch (e) {
+    console.error(e);
+    Utils.toast(e.message || 'Impossible de préparer le fichier.', 'err');
+  }
+};
+
+Pages.shareReady = async function () {
+  const r = Delivery.ready;
+  if (!r) return;
+  const sale = DB.getSale(r.saleId);
+  const book = DB.getBook(r.bookId);
+  const client = DB.getClient(sale.clientId);
+  const text = Delivery.message(sale, book, r.kind);
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [r.file] })) {
+      await navigator.share({ files: [r.file], text });
+      DB.registerDelivery(r.saleId, r.bookId, r.kind);
+      Utils.toast('Fichier envoyé ✅');
+    } else {
+      // Navigateur sans partage de fichiers (ordinateur) : on enregistre le fichier
+      // et on ouvre la conversation WhatsApp du client pour l'y joindre.
+      Delivery.download(r.file);
+      const num = Delivery.waNumber(client ? client.phone : '');
+      window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, '_blank');
+      DB.registerDelivery(r.saleId, r.bookId, r.kind);
+      Utils.toast('Fichier enregistré — joignez-le dans la conversation WhatsApp.', 'warn');
+    }
+    Delivery.ready = null;
+    Utils.closeModal();
+    Router.render();
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // l'utilisateur a annulé
+    console.error(e);
+    Utils.toast("Envoi impossible. Utilisez « Enregistrer sur l'appareil » puis joignez le fichier dans WhatsApp.", 'err');
+  }
+};
+
+Pages.saveReady = function () {
+  const r = Delivery.ready;
+  if (!r) return;
+  Delivery.download(r.file);
+  DB.registerDelivery(r.saleId, r.bookId, r.kind);
+  Utils.toast('Fichier enregistré ✅');
+  Delivery.ready = null;
+  Utils.closeModal();
+  Router.render();
 };
 
 Pages.removeSale = function (id) {
@@ -540,6 +651,7 @@ Pages.reportsByType = function (type) {
       <h3>${icon} ${label} vendus : <span class="gold-text">${sold}</span></h3>
       <h3 class="mt-8">💰 Chiffre d'affaires ${label.toLowerCase()} : <span class="gold-text">${Utils.money(revenue)}</span></h3>
       <h3 class="mt-8">📈 Bénéfice ${label.toLowerCase()} : <span class="gold-text">${Utils.money(profit)}</span></h3>
+      ${type === 'ebook' ? (() => { const d = DB.totalDeliveries(); return `<h3 class="mt-8">📤 Fichiers envoyés aux clients : <span class="gold-text">${d.pdf} PDF · ${d.audio} audio</span></h3>`; })() : ''}
     </div>
     <div class="section-block">
       <h3>🏆 ${label} les plus vendus</h3>
@@ -605,7 +717,7 @@ Pages.backup = function () {
     </div>
     <div class="card mb-8">
       <h3>⬇️ Export</h3>
-      <p class="text-muted mt-8" style="font-size:.85rem">Téléchargez une copie complète de vos données (livres, clients, ventes, réglages) au format JSON.</p>
+      <p class="text-muted mt-8" style="font-size:.85rem">Téléchargez une copie complète de vos données (livres, clients, ventes, réglages) au format JSON. Les fichiers PDF et audio des e-books ne sont pas inclus (trop volumineux) : gardez-en une copie sur votre téléphone ou votre ordinateur.</p>
       <button class="btn btn-primary mt-16" onclick="Pages.exportData()">Exporter les données (JSON)</button>
     </div>
     <div class="card mb-8">

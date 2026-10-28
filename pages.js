@@ -119,6 +119,7 @@ Pages.books = function (query = '', typeFilter = 'all') {
           <div class="author">${Utils.escapeHtml(b.author || '—')}</div>
           <div class="stock-row"><span class="price">${Utils.money(b.price)}</span>${badge}</div>
           <div class="mt-8 text-muted" style="font-size:.72rem">Stock : ${isEbook ? 'Illimité ∞' : b.stock}</div>
+          ${isEbook ? `<div class="text-muted" style="font-size:.68rem;margin-top:4px">${b.pdfName ? '📄 PDF ✓' : '📄 PDF manquant'} · ${b.audioName ? '🎧 Audio ✓' : 'sans audio'}${b.filesEnabled === false ? ' · 🚫 désactivé' : ''}<br>📤 ${b.pdfSent || 0} envoi(s) PDF${b.audioName ? ' · ' + (b.audioSent || 0) + ' audio' : ''}</div>` : ''}
         </div>
       </div>`;
   }).join('') : `<div class="empty-state"><div class="ic">📚</div><p>Aucun livre trouvé. Ajoutez votre premier livre ou e-book avec le bouton +.</p></div>`;
@@ -154,9 +155,42 @@ Pages.refreshBooks = function (q) {
   if (match) document.getElementById('book-grid').outerHTML = match[0];
 };
 
+Pages._pending = { pdf: undefined, audio: undefined }; // undefined = inchangé, File = nouveau, null = retirer
+
+Pages.fileStatusHtml = function (book, kind) {
+  const p = Pages._pending[kind];
+  if (p instanceof File) return `<div>✅ Nouveau fichier : <strong>${Utils.escapeHtml(p.name)}</strong> (${Pages.fmtSize(p.size)})</div><div class="text-muted" style="font-size:.72rem">Sera enregistré en appuyant sur « Enregistrer »</div>`;
+  if (p === null) return `<div>🗑 Fichier retiré</div><div class="text-muted" style="font-size:.72rem">Sera supprimé en appuyant sur « Enregistrer »</div>`;
+  const name = book ? book[kind + 'Name'] : '';
+  const size = book ? book[kind + 'Size'] : 0;
+  if (name) return `<div>✅ <strong>${Utils.escapeHtml(name)}</strong> (${Pages.fmtSize(size)})</div><div class="text-muted" style="font-size:.72rem">Appuyez pour remplacer par une nouvelle version</div>`;
+  return `<div style="font-size:1.6rem">${kind === 'pdf' ? '📄' : '🎧'}</div><div>Importer le fichier ${kind === 'pdf' ? 'PDF' : 'audio'}</div>`;
+};
+
+Pages.fmtSize = function (bytes) {
+  const n = Number(bytes) || 0;
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' Mo';
+  return Math.max(1, Math.round(n / 1024)) + ' Ko';
+};
+
+Pages.refreshFileStatus = function (kind) {
+  const id = Pages._editingBookId;
+  const el = document.getElementById(kind + '-status');
+  if (el) el.innerHTML = Pages.fileStatusHtml(id ? DB.getBook(id) : null, kind);
+};
+
+Pages.clearPending = function (kind) {
+  Pages._pending[kind] = null;
+  const input = document.getElementById('f-' + kind);
+  if (input) input.value = '';
+  Pages.refreshFileStatus(kind);
+};
+
 Pages.openBookForm = function (id) {
   const book = id ? DB.getBook(id) : null;
   const type = book ? (book.type || 'papier') : 'papier';
+  Pages._pending = { pdf: undefined, audio: undefined };
+  Pages._editingBookId = id || null;
   Utils.openModal(`
     <div class="modal-header">
       <h3>${book ? 'Modifier le livre' : 'Nouveau livre'}</h3>
@@ -211,8 +245,32 @@ Pages.openBookForm = function (id) {
         <input type="number" id="f-minalert" value="${book ? book.minAlert : 3}" min="0">
       </div>
     </div>
-    <div class="form-group" id="ebook-link-field" style="${type==='ebook'?'':'display:none'}">
-      <label>Lien / fichier de l'e-book (optionnel)</label>
+    <div id="ebook-files-field" style="${type==='ebook'?'':'display:none'}">
+      <div class="form-group">
+        <label>📄 Fichier PDF de l'e-book</label>
+        <div class="upload-box" id="pdf-box">
+          <div id="pdf-status">${Pages.fileStatusHtml(book, 'pdf')}</div>
+          <input type="file" accept="application/pdf,.pdf" id="f-pdf">
+        </div>
+        <button type="button" class="btn btn-outline btn-sm mt-8" onclick="Pages.clearPending('pdf')">Retirer le PDF</button>
+      </div>
+      <div class="form-group">
+        <label>🎧 Fichier audio (optionnel)</label>
+        <div class="upload-box" id="audio-box">
+          <div id="audio-status">${Pages.fileStatusHtml(book, 'audio')}</div>
+          <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" id="f-audio">
+        </div>
+        <button type="button" class="btn btn-outline btn-sm mt-8" onclick="Pages.clearPending('audio')">Retirer l'audio</button>
+      </div>
+      <div class="stock-row">
+        <span>Livraison activée (PDF / audio)</span>
+        <input type="checkbox" id="f-filesenabled" ${!book || book.filesEnabled !== false ? 'checked' : ''} style="width:20px;height:20px">
+      </div>
+      ${book ? `<div class="text-muted mt-8" style="font-size:.78rem">📤 Envoyés à des clients : <strong>${book.pdfSent || 0}</strong> PDF · <strong>${book.audioSent || 0}</strong> audio</div>` : ''}
+      <div class="text-muted mt-8" style="font-size:.72rem">Pour remplacer une version, choisissez simplement un nouveau fichier. Les fichiers restent sur cet appareil.</div>
+    </div>
+    <div class="form-group mt-16" id="ebook-link-field" style="${type==='ebook'?'':'display:none'}">
+      <label>Lien externe (optionnel — Drive, WeTransfer...)</label>
       <input type="text" id="f-downloadlink" value="${book ? Utils.escapeHtml(book.downloadLink || '') : ''}" placeholder="Lien Google Drive, WeTransfer...">
     </div>
     <div class="tag-row mt-16">
@@ -235,14 +293,34 @@ Pages.openBookForm = function (id) {
     });
   };
   bindCoverInput();
+
+  [['pdf', 'application/pdf'], ['audio', 'audio/']].forEach(([kind, mime]) => {
+    const input = document.getElementById('f-' + kind);
+    if (!input) return;
+    input.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const okType = kind === 'pdf'
+        ? (file.type === 'application/pdf' || /\.pdf$/i.test(file.name))
+        : (file.type.startsWith('audio/') || /\.(mp3|m4a|wav|ogg|aac)$/i.test(file.name));
+      if (!okType) {
+        Utils.toast(kind === 'pdf' ? 'Choisissez un fichier PDF.' : 'Choisissez un fichier audio.', 'err');
+        input.value = '';
+        return;
+      }
+      Pages._pending[kind] = file;
+      Pages.refreshFileStatus(kind);
+    });
+  });
 };
 
 Pages.toggleEbookFields = function (type) {
   document.getElementById('stock-fields').style.display = type === 'ebook' ? 'none' : '';
   document.getElementById('ebook-link-field').style.display = type === 'ebook' ? '' : 'none';
+  document.getElementById('ebook-files-field').style.display = type === 'ebook' ? '' : 'none';
 };
 
-Pages.saveBook = function (id) {
+Pages.saveBook = async function (id) {
   const title = document.getElementById('f-title').value.trim();
   if (!title) { Utils.toast('Le titre est obligatoire.', 'err'); return; }
   const coverBox = document.getElementById('cover-box');
@@ -259,16 +337,43 @@ Pages.saveBook = function (id) {
     stock: type === 'ebook' ? 0 : (Number(document.getElementById('f-stock').value) || 0),
     minAlert: type === 'ebook' ? 0 : (Number(document.getElementById('f-minalert').value) || 0),
     downloadLink: type === 'ebook' ? document.getElementById('f-downloadlink').value.trim() : '',
+    filesEnabled: type === 'ebook' ? document.getElementById('f-filesenabled').checked : true,
     cover: coverImg ? coverImg.getAttribute('src') : ''
   };
+  let book;
   if (id) {
-    DB.updateBook(id, payload);
-    Utils.toast('Livre mis à jour ✅');
+    book = DB.updateBook(id, payload);
   } else {
     payload.sold = 0;
-    DB.addBook(payload);
-    Utils.toast(type === 'ebook' ? 'E-book ajouté ✅' : 'Livre ajouté ✅');
+    payload.pdfName = ''; payload.pdfSize = 0; payload.audioName = ''; payload.audioSize = 0;
+    payload.pdfSent = 0; payload.audioSent = 0;
+    book = DB.addBook(payload);
   }
+
+  // Fichiers PDF / audio (stockés dans IndexedDB)
+  if (type === 'ebook' && book) {
+    try {
+      for (const kind of ['pdf', 'audio']) {
+        const pending = Pages._pending[kind];
+        if (pending instanceof File) {
+          await FileStore.persist();
+          await FileStore.put(book.id, kind, pending);
+          DB.updateBook(book.id, { [kind + 'Name']: pending.name, [kind + 'Size']: pending.size });
+        } else if (pending === null) {
+          await FileStore.del(book.id, kind);
+          DB.updateBook(book.id, { [kind + 'Name']: '', [kind + 'Size']: 0 });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      Utils.toast("Le livre est enregistré, mais le fichier n'a pas pu être stocké (espace insuffisant ?).", 'err');
+      Utils.closeModal();
+      Router.render();
+      return;
+    }
+  }
+
+  Utils.toast(id ? 'Livre mis à jour ✅' : (type === 'ebook' ? 'E-book ajouté ✅' : 'Livre ajouté ✅'));
   Utils.closeModal();
   Router.render();
 };
@@ -276,6 +381,8 @@ Pages.saveBook = function (id) {
 Pages.removeBook = function (id) {
   if (!confirm('Supprimer définitivement ce livre ?')) return;
   DB.deleteBook(id);
+  FileStore.del(id, 'pdf').catch(() => {});
+  FileStore.del(id, 'audio').catch(() => {});
   Utils.closeModal();
   Utils.toast('Livre supprimé');
   Router.render();

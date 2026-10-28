@@ -56,6 +56,14 @@ const DB = {
       if (b.downloadLink === undefined) b.downloadLink = '';
       if (b.stock === undefined || b.stock === null) b.stock = 0;
       if (b.sold === undefined || b.sold === null) b.sold = 0;
+      // Fichiers e-book (PDF / audio) — les fichiers eux-mêmes sont dans IndexedDB
+      if (b.pdfName === undefined) b.pdfName = '';
+      if (b.pdfSize === undefined) b.pdfSize = 0;
+      if (b.audioName === undefined) b.audioName = '';
+      if (b.audioSize === undefined) b.audioSize = 0;
+      if (b.filesEnabled === undefined) b.filesEnabled = true;
+      if (b.pdfSent === undefined) b.pdfSent = 0;
+      if (b.audioSent === undefined) b.audioSent = 0;
     });
     this.data.sales.forEach(s => {
       const subtotal = (s.items || []).reduce((sum, it) => sum + Number(it.price || 0) * Number(it.qty || 0), 0);
@@ -202,6 +210,27 @@ const DB = {
   },
   getSale(id) {
     return this.data.sales.find(x => x.id === id);
+  },
+  // Enregistre l'envoi d'un fichier (PDF ou audio) à un client
+  registerDelivery(saleId, bookId, kind) {
+    const sale = this.getSale(saleId);
+    const book = this.getBook(bookId);
+    if (sale) {
+      sale.deliveries = sale.deliveries || [];
+      sale.deliveries.push({ bookId, kind, at: new Date().toISOString() });
+    }
+    if (book) {
+      if (kind === 'audio') book.audioSent = (book.audioSent || 0) + 1;
+      else book.pdfSent = (book.pdfSent || 0) + 1;
+    }
+    this.save();
+  },
+  totalDeliveries() {
+    return this.data.books.reduce((acc, b) => {
+      acc.pdf += Number(b.pdfSent || 0);
+      acc.audio += Number(b.audioSent || 0);
+      return acc;
+    }, { pdf: 0, audio: 0 });
   },
 
   // ---------- Aggregates ----------
