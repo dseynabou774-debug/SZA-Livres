@@ -13,27 +13,6 @@ Pages.dashboard = function () {
   const bestEbook = DB.bestSellers(5, 'ebook');
   const lowStock = DB.data.books.filter(b => DB.bookStatus(b) !== 'disponible');
 
-  // Les audios ne font pas partie de DB.data.books (catalogue géré côté
-  // Supabase), donc on calcule leurs statistiques directement à partir
-  // des ventes enregistrées, sans toucher à DB.totals().
-  let audioSold = 0;
-  let audioRevenue = 0;
-  const audioSoldByTitle = {};
-  (DB.data.sales || []).forEach(s => {
-    (s.items || []).forEach(it => {
-      if (it.isAudio) {
-        const qty = it.qty || 1;
-        audioSold += qty;
-        audioRevenue += qty * (it.price || 0);
-        const key = it.title || 'Audio';
-        if (!audioSoldByTitle[key]) audioSoldByTitle[key] = { title: key, sold: 0, price: it.price || 0 };
-        audioSoldByTitle[key].sold += qty;
-      }
-    });
-  });
-  const audioProfit = audioRevenue; // pas de coût de production associé, comme pour les e-books
-  const bestAudio = Object.values(audioSoldByTitle).sort((a, b) => b.sold - a.sold).slice(0, 5);
-
   let alertHtml = '';
   if (lowStock.length) {
     alertHtml = `<div class="alert-banner">⚠️ ${lowStock.length} livre(s) proche(s) de la rupture ou en rupture de stock.</div>`;
@@ -86,12 +65,6 @@ Pages.dashboard = function () {
           <div class="stock-row"><span class="text-muted">Chiffre d'affaires</span><strong>${Utils.money(t.ebookRevenue)}</strong></div>
           <div class="stock-row"><span class="text-muted">Bénéfice</span><strong class="gold-text">${Utils.money(t.ebookProfit)}</strong></div>
         </div>
-        <div class="card" style="border-left:4px solid var(--gold); grid-column:1 / -1">
-          <h3 style="font-size:.95rem">🎧 Audios</h3>
-          <div class="stock-row mt-8"><span class="text-muted">Vendus</span><strong>${audioSold}</strong></div>
-          <div class="stock-row"><span class="text-muted">Chiffre d'affaires</span><strong>${Utils.money(audioRevenue)}</strong></div>
-          <div class="stock-row"><span class="text-muted">Bénéfice</span><strong class="gold-text">${Utils.money(audioProfit)}</strong></div>
-        </div>
       </div>
     </div>
 
@@ -102,10 +75,6 @@ Pages.dashboard = function () {
     <div class="section-block">
       <h3>📱 E-books les plus vendus</h3>
       <div class="list">${bestListHtml(bestEbook, 'Aucune vente d\'e-book pour le moment.')}</div>
-    </div>
-    <div class="section-block">
-      <h3>🎧 Audios les plus vendus</h3>
-      <div class="list">${bestListHtml(bestAudio, 'Aucune vente d\'audio pour le moment.')}</div>
     </div>
 
     <div class="section-block">
@@ -123,85 +92,41 @@ Pages.dashboard = function () {
 /* ---------------------------------------------------------
    BOOKS
 --------------------------------------------------------- */
-/* ---------------------------------------------------------
-   AUDIO CATALOG CACHE (Supabase audio_products)
---------------------------------------------------------- */
-Pages.audioCache = null;
-
-Pages.loadAudioCache = async function (forceReload) {
-  if (Pages.audioCache && !forceReload) return Pages.audioCache;
-  Pages.audioCache = await Audiobooks.listAll();
-  return Pages.audioCache;
-};
-
 Pages.books = function (query = '', typeFilter = 'all') {
   const q = query.trim().toLowerCase();
-  let cardsHtml;
+  let books = [...DB.data.books].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  if (q) books = books.filter(b => b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q));
+  if (typeFilter === 'papier') books = books.filter(b => b.type !== 'ebook');
+  if (typeFilter === 'ebook') books = books.filter(b => b.type === 'ebook');
 
-  if (typeFilter === 'audio') {
-    if (!Pages.audioCache) {
-      Pages.loadAudioCache().then(() => {
-        if (Pages.bookTypeFilter === 'audio') {
-          const qNow = document.getElementById('book-search') ? document.getElementById('book-search').value : '';
-          const grid = document.getElementById('main-content');
-          if (grid) grid.innerHTML = Pages.books(qNow, 'audio');
-        }
-      });
-      cardsHtml = `<div class="empty-state"><div class="ic">🎧</div><p>Chargement des audios...</p></div>`;
-    } else {
-      let audios = [...Pages.audioCache];
-      if (q) audios = audios.filter(a => a.title.toLowerCase().includes(q));
-      cardsHtml = audios.length ? audios.map(a => `
-        <div class="book-card" onclick="Pages.openAudioDetails('${a.id}')">
-          <div class="book-cover">🎧</div>
-          <div class="book-info">
-            <div class="tag-row mb-8"><span class="chip" style="padding:2px 9px;font-size:.62rem">🎧 Audio</span></div>
-            <div class="title">${Utils.escapeHtml(a.title)}</div>
-            <div class="author">${Utils.escapeHtml(a.language || '—')}</div>
-            <div class="stock-row"><span class="price">${Utils.money(a.price)}</span><span class="badge badge-ok">Illimité</span></div>
-            <div class="mt-8 text-muted" style="font-size:.72rem">${a.duration_seconds ? Math.round(a.duration_seconds/60) + ' min' : ''}</div>
-          </div>
-        </div>`).join('') : `<div class="empty-state"><div class="ic">🎧</div><p>Aucun audio trouvé.</p></div>`;
-    }
-  } else {
-    let books = [...DB.data.books].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    if (q) books = books.filter(b => b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q));
-    if (typeFilter === 'papier') books = books.filter(b => b.type !== 'ebook');
-    if (typeFilter === 'ebook') books = books.filter(b => b.type === 'ebook');
-
-    cardsHtml = books.length ? books.map(b => {
-      const isEbook = DB.isEbook(b);
-      const status = DB.bookStatus(b);
-      const badge = isEbook ? '<span class="badge badge-ok">Illimité</span>'
-        : status === 'rupture' ? '<span class="badge badge-danger">Rupture</span>'
-        : status === 'alerte' ? '<span class="badge badge-warn">Stock faible</span>'
-        : '<span class="badge badge-ok">Disponible</span>';
-      const typeTag = isEbook ? '<span class="chip" style="padding:2px 9px;font-size:.62rem">💻 E-book</span>' : '<span class="chip" style="padding:2px 9px;font-size:.62rem">📄 Papier</span>';
-      const cover = b.cover
-        ? `<img class="book-cover" src="${b.cover}" alt="${Utils.escapeHtml(b.title)}">`
-        : `<div class="book-cover">${isEbook ? '💻' : '📘'}</div>`;
-      return `
-        <div class="book-card" onclick="Pages.openBookForm('${b.id}')">
-          ${cover}
-          <div class="book-info">
-            <div class="tag-row mb-8">${typeTag}</div>
-            <div class="title">${Utils.escapeHtml(b.title)}</div>
-            <div class="author">${Utils.escapeHtml(b.author || '—')}</div>
-            <div class="stock-row"><span class="price">${Utils.money(b.price)}</span>${badge}</div>
-            <div class="mt-8 text-muted" style="font-size:.72rem">Stock : ${isEbook ? 'Illimité ∞' : b.stock}</div>
-          </div>
-        </div>`;
-    }).join('') : `<div class="empty-state"><div class="ic">📚</div><p>Aucun livre trouvé. Ajoutez votre premier livre ou e-book avec le bouton +.</p></div>`;
-  }
-
-  const addBtn = typeFilter === 'audio'
-    ? `<button class="btn btn-primary btn-sm" onclick="Pages.openAudioForm()">+ Ajouter un audio</button>`
-    : `<button class="btn btn-primary btn-sm" onclick="Pages.openBookForm()">+ Ajouter un livre</button>`;
+  const cardsHtml = books.length ? books.map(b => {
+    const isEbook = DB.isEbook(b);
+    const status = DB.bookStatus(b);
+    const badge = isEbook ? '<span class="badge badge-ok">Illimité</span>'
+      : status === 'rupture' ? '<span class="badge badge-danger">Rupture</span>'
+      : status === 'alerte' ? '<span class="badge badge-warn">Stock faible</span>'
+      : '<span class="badge badge-ok">Disponible</span>';
+    const typeTag = isEbook ? '<span class="chip" style="padding:2px 9px;font-size:.62rem">💻 E-book</span>' : '<span class="chip" style="padding:2px 9px;font-size:.62rem">📄 Papier</span>';
+    const cover = b.cover
+      ? `<img class="book-cover" src="${b.cover}" alt="${Utils.escapeHtml(b.title)}">`
+      : `<div class="book-cover">${isEbook ? '💻' : '📘'}</div>`;
+    return `
+      <div class="book-card" onclick="Pages.openBookForm('${b.id}')">
+        ${cover}
+        <div class="book-info">
+          <div class="tag-row mb-8">${typeTag}</div>
+          <div class="title">${Utils.escapeHtml(b.title)}</div>
+          <div class="author">${Utils.escapeHtml(b.author || '—')}</div>
+          <div class="stock-row"><span class="price">${Utils.money(b.price)}</span>${badge}</div>
+          <div class="mt-8 text-muted" style="font-size:.72rem">Stock : ${isEbook ? 'Illimité ∞' : b.stock}</div>
+        </div>
+      </div>`;
+  }).join('') : `<div class="empty-state"><div class="ic">📚</div><p>Aucun livre trouvé. Ajoutez votre premier livre ou e-book avec le bouton +.</p></div>`;
 
   return `
     <div class="page-title">
       <div><span class="eyebrow">Catalogue</span><h2>Gestion des livres</h2></div>
-      ${addBtn}
+      <button class="btn btn-primary btn-sm" onclick="Pages.openBookForm()">+ Ajouter un livre</button>
     </div>
     <div class="search-bar">
       <span class="ic">🔍</span>
@@ -211,134 +136,9 @@ Pages.books = function (query = '', typeFilter = 'all') {
       <span class="chip ${typeFilter==='all'?'active':''}" onclick="Pages.setBookFilter('all')">Tous</span>
       <span class="chip ${typeFilter==='papier'?'active':''}" onclick="Pages.setBookFilter('papier')">📄 Livres papier</span>
       <span class="chip ${typeFilter==='ebook'?'active':''}" onclick="Pages.setBookFilter('ebook')">💻 E-books</span>
-      <span class="chip ${typeFilter==='audio'?'active':''}" onclick="Pages.setBookFilter('audio')">🎧 Audios</span>
     </div>
     <div class="book-grid" id="book-grid">${cardsHtml}</div>
   `;
-};
-
-Pages.openAudioDetails = function (id) {
-  const a = (Pages.audioCache || []).find(x => x.id === id);
-  if (!a) return;
-  Utils.openModal(`
-    <div class="modal-header">
-      <h3>🎧 Modifier l'audio</h3>
-      <button class="modal-close" onclick="Utils.closeModal()">✕</button>
-    </div>
-    <div class="form-group">
-      <label>Titre *</label>
-      <input type="text" id="fae-title" value="${Utils.escapeHtml(a.title)}">
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Langue</label>
-        <input type="text" id="fae-language" value="${Utils.escapeHtml(a.language || '')}">
-      </div>
-      <div class="form-group">
-        <label>Prix (${DB.data.settings.currency})</label>
-        <input type="number" id="fae-price" min="0" value="${a.price != null ? a.price : ''}">
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Description</label>
-      <textarea id="fae-description" rows="3">${Utils.escapeHtml(a.description || '')}</textarea>
-    </div>
-    ${a.duration_seconds ? `<div class="text-muted mt-8" style="font-size:.8rem">Durée : ${Math.round(a.duration_seconds/60)} min</div>` : ''}
-    <div class="text-muted mt-8" id="fae-status-box"></div>
-    <div class="tag-row mt-16">
-      <button class="btn btn-primary" onclick="Pages.saveAudioEdit('${a.id}')">💾 Enregistrer</button>
-      <button class="btn btn-outline" onclick="Utils.closeModal()">Annuler</button>
-    </div>
-  `);
-};
-
-Pages.saveAudioEdit = async function (id) {
-  const title = document.getElementById('fae-title').value.trim();
-  if (!title) { Utils.toast('Le titre est obligatoire.', 'err'); return; }
-  const statusBox = document.getElementById('fae-status-box');
-  statusBox.textContent = '⏳ Enregistrement...';
-  const ok = await Audiobooks.updateProduct(id, {
-    title,
-    language: document.getElementById('fae-language').value.trim(),
-    price: Number(document.getElementById('fae-price').value) || 0,
-    description: document.getElementById('fae-description').value.trim()
-  });
-  if (!ok) { statusBox.textContent = ''; return; }
-  Utils.toast('Audio mis à jour ✅');
-  Pages.audioCache = null;
-  Utils.closeModal();
-  const q = document.getElementById('book-search') ? document.getElementById('book-search').value : '';
-  const holder = document.getElementById('main-content');
-  if (holder) holder.innerHTML = Pages.books(q, 'audio');
-};
-
-Pages.openAudioForm = function () {
-  Utils.openModal(`
-    <div class="modal-header">
-      <h3>Nouvel audio</h3>
-      <button class="modal-close" onclick="Utils.closeModal()">✕</button>
-    </div>
-    <div class="form-group">
-      <label>Titre *</label>
-      <input type="text" id="fa-title" placeholder="Titre du chapitre">
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Langue</label>
-        <input type="text" id="fa-language" placeholder="Wolof, Français...">
-      </div>
-      <div class="form-group">
-        <label>Prix (${DB.data.settings.currency})</label>
-        <input type="number" id="fa-price" min="0">
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Description</label>
-      <textarea id="fa-description" rows="3" placeholder="Courte description"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Fichier audio *</label>
-      <input type="file" id="fa-file" accept="audio/*">
-    </div>
-    <div class="text-muted mt-8" id="fa-status-box"></div>
-    <div class="tag-row mt-16">
-      <button class="btn btn-primary" id="fa-save-btn" onclick="Pages.saveAudioProduct()">💾 Enregistrer</button>
-      <button class="btn btn-outline" onclick="Utils.closeModal()">Annuler</button>
-    </div>
-  `);
-};
-
-Pages.saveAudioProduct = async function () {
-  const title = document.getElementById('fa-title').value.trim();
-  if (!title) { Utils.toast('Le titre est obligatoire.', 'err'); return; }
-  const fileInput = document.getElementById('fa-file');
-  const file = fileInput.files[0];
-  if (!file) { Utils.toast('Sélectionnez un fichier audio.', 'err'); return; }
-
-  const statusBox = document.getElementById('fa-status-box');
-  const saveBtn = document.getElementById('fa-save-btn');
-  saveBtn.disabled = true;
-
-  statusBox.textContent = '⏳ Envoi du fichier en cours...';
-  const path = await Audiobooks.uploadFile(file);
-  if (!path) { statusBox.textContent = ''; saveBtn.disabled = false; return; }
-
-  statusBox.textContent = '⏳ Création de la fiche produit...';
-  const product = await Audiobooks.createProduct({
-    title,
-    language: document.getElementById('fa-language').value.trim(),
-    price: Number(document.getElementById('fa-price').value) || 0,
-    description: document.getElementById('fa-description').value.trim(),
-    storage_path: path
-  });
-  if (!product) { statusBox.textContent = ''; saveBtn.disabled = false; return; }
-
-  Utils.toast('Audio ajouté ✅');
-  Pages.audioCache = null;
-  Utils.closeModal();
-  const q = document.getElementById('book-search') ? document.getElementById('book-search').value : '';
-  const holder = document.getElementById('main-content');
-  if (holder) holder.innerHTML = Pages.books(q, 'audio');
 };
 
 Pages.bookTypeFilter = 'all';
@@ -412,15 +212,8 @@ Pages.openBookForm = function (id) {
       </div>
     </div>
     <div class="form-group" id="ebook-link-field" style="${type==='ebook'?'':'display:none'}">
-      <label>Fichier PDF de l'e-book</label>
-      <input type="file" id="f-ebookfile" accept="application/pdf">
-      <div class="tag-row mt-8">
-        <label style="display:flex;align-items:center;gap:6px;font-weight:600;">
-          <input type="checkbox" id="f-ebookactive" checked>
-          Téléchargement activé
-        </label>
-      </div>
-      <div class="text-muted mt-8" id="ebook-status-box"></div>
+      <label>Lien / fichier de l'e-book (optionnel)</label>
+      <input type="text" id="f-downloadlink" value="${book ? Utils.escapeHtml(book.downloadLink || '') : ''}" placeholder="Lien Google Drive, WeTransfer...">
     </div>
     <div class="tag-row mt-16">
       <button class="btn btn-primary" onclick="Pages.saveBook('${book ? book.id : ''}')">💾 Enregistrer</button>
@@ -442,15 +235,6 @@ Pages.openBookForm = function (id) {
     });
   };
   bindCoverInput();
-  if (book && book.type === 'ebook') {
-    Ebooks.getInfo(book.id).then(info => {
-      const box = document.getElementById('ebook-status-box');
-      if (!box) return;
-      if (!info) { box.textContent = 'Pas encore synchronisé.'; return; }
-      document.getElementById('f-ebookactive').checked = info.active;
-      box.innerHTML = `📦 Version ${info.version} · 📥 ${info.download_count} téléchargement(s) · ${info.storage_path ? '✅ Fichier en ligne' : '⚠️ Aucun fichier'}`;
-    });
-  }
 };
 
 Pages.toggleEbookFields = function (type) {
@@ -458,7 +242,7 @@ Pages.toggleEbookFields = function (type) {
   document.getElementById('ebook-link-field').style.display = type === 'ebook' ? '' : 'none';
 };
 
-Pages.saveBook = async function (id) {
+Pages.saveBook = function (id) {
   const title = document.getElementById('f-title').value.trim();
   if (!title) { Utils.toast('Le titre est obligatoire.', 'err'); return; }
   const coverBox = document.getElementById('cover-box');
@@ -474,39 +258,16 @@ Pages.saveBook = async function (id) {
     cost: Number(document.getElementById('f-cost').value) || 0,
     stock: type === 'ebook' ? 0 : (Number(document.getElementById('f-stock').value) || 0),
     minAlert: type === 'ebook' ? 0 : (Number(document.getElementById('f-minalert').value) || 0),
+    downloadLink: type === 'ebook' ? document.getElementById('f-downloadlink').value.trim() : '',
     cover: coverImg ? coverImg.getAttribute('src') : ''
   };
-  let savedBook;
   if (id) {
-    savedBook = DB.updateBook(id, payload);
+    DB.updateBook(id, payload);
     Utils.toast('Livre mis à jour ✅');
   } else {
     payload.sold = 0;
-    savedBook = DB.addBook(payload);
+    DB.addBook(payload);
     Utils.toast(type === 'ebook' ? 'E-book ajouté ✅' : 'Livre ajouté ✅');
-  }
-  if (type === 'ebook' && savedBook) {
-    const active = document.getElementById('f-ebookactive').checked;
-    // --- BLOC DE DIAGNOSTIC AJOUTÉ ---
-    // On entoure les appels réseau d'un try/catch pour que toute erreur
-    // (réseau, exception JS, promesse rejetée) s'affiche clairement
-    // via une alerte bloquante, au lieu de disparaître silencieusement.
-    try {
-      alert('Étape 1 : début synchro e-book pour ' + savedBook.id);
-      await Ebooks.syncBook(savedBook.id, title, active);
-      alert('Étape 2 : synchro terminée. Vérification du fichier...');
-      const fileInput = document.getElementById('f-ebookfile');
-      if (fileInput && fileInput.files[0]) {
-        alert('Étape 3 : fichier détecté (' + fileInput.files[0].name + ', ' + fileInput.files[0].size + ' octets). Envoi en cours...');
-        await Ebooks.uploadFile(savedBook.id, fileInput.files[0]);
-        alert('Étape 4 : uploadFile terminé sans exception.');
-      } else {
-        alert('Étape 3 (info) : aucun fichier détecté dans le champ PDF.');
-      }
-    } catch (e) {
-      alert('❌ ERREUR CAPTURÉE : ' + (e && e.message ? e.message : JSON.stringify(e)));
-    }
-    // --- FIN DU BLOC DE DIAGNOSTIC ---
   }
   Utils.closeModal();
   Router.render();

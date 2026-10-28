@@ -191,6 +191,13 @@ const DB = {
       });
     }
     this.data.sales = this.data.sales.filter(x => x.id !== id);
+    if (sale) {
+      const client = this.getClient(sale.clientId);
+      if (client) {
+        const left = this.data.sales.filter(x => x.clientId === client.id).sort((a, b) => new Date(b.date) - new Date(a.date));
+        client.lastPurchaseDate = left.length ? left[0].date : undefined;
+      }
+    }
     this.save();
   },
   getSale(id) {

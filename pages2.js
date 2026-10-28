@@ -16,7 +16,7 @@ Pages.sales = function () {
           <div class="title">${client ? Utils.escapeHtml(client.name) : 'Client supprimé'}</div>
           <div class="meta">${Utils.dateTimeFmt(s.date)} · ${Utils.money(s.total)}${s.discount ? ` <span class="gold-text">(- ${Utils.money(s.discount)})</span>` : ''}</div>
         </div>
-        <div class="trail">${Utils.statusBadge(s.status)}</div>
+        <div class="trail">${Utils.statusBadge(s.status)}<button class="icon-btn" title="Supprimer" style="background:transparent;color:var(--danger);width:32px;height:32px" onclick="event.stopPropagation(); Pages.removeSale('${s.id}')">🗑</button></div>
       </div>`;
   }).join('') : `<div class="empty-state"><div class="ic">🧾</div><p>Aucune vente enregistrée. Créez votre première vente avec le bouton +.</p></div>`;
 
@@ -38,17 +38,10 @@ Pages.saleNew = function (presetClientId) {
   if (!Pages.saleDraft) {
     Pages.saleDraft = { clientId: presetClientId || '', items: [], discount: 0, paid: 0, paymentStatus: 'Payé', method: 'Espèces', date: new Date().toISOString().slice(0, 16) };
   }
-  if (!Pages.audioCache) {
-    Pages.loadAudioCache().then(() => {
-      if (Router.current.page === 'sales' && Router.current.param === 'new') Router.render();
-    });
-  }
-
   const d = Pages.saleDraft;
   const clients = DB.data.clients;
   // Physical books only show up while in stock; e-books are always available (unlimited stock)
   const books = DB.data.books.filter(b => b.type === 'ebook' || b.stock > 0);
-  const audios = Pages.audioCache || [];
 
   const clientOptions = clients.map(c => `<option value="${c.id}" ${d.clientId === c.id ? 'selected' : ''}>${Utils.escapeHtml(c.name)} (${Utils.escapeHtml(c.phone||'')})</option>`).join('');
 
@@ -59,14 +52,13 @@ Pages.saleNew = function (presetClientId) {
 
   const itemsHtml = d.items.length ? d.items.map((it, idx) => `
     <div class="sale-line">
-      <div class="name">${Utils.escapeHtml(it.title)}${it.isEbook ? ' <span class="badge badge-ok" style="font-size:.6rem">E-book</span>' : ''}${it.isAudio ? ' <span class="badge badge-ok" style="font-size:.6rem">🎧 Audio</span>' : ''}</div>
-      ${it.isAudio ? `<div></div>` : `<input type="number" min="1" value="${it.qty}" onchange="Pages.updateSaleQty(${idx}, this.value)">`}
+      <div class="name">${Utils.escapeHtml(it.title)}${it.isEbook ? ' <span class="badge badge-ok" style="font-size:.6rem">E-book</span>' : ''}</div>
+      <input type="number" min="1" value="${it.qty}" onchange="Pages.updateSaleQty(${idx}, this.value)">
       <div>${Utils.money(it.qty * it.price)}</div>
       <button class="icon-btn" style="background:transparent;color:var(--danger)" onclick="Pages.removeSaleItem(${idx})">✕</button>
     </div>`).join('') : `<div class="text-muted" style="font-size:.85rem">Aucun livre sélectionné.</div>`;
 
-  const bookPicker = books.map(b => `<option value="${b.id}">${Utils.escapeHtml(b.title)} ${b.type==='ebook'?'💻':'📄'} — ${Utils.money(b.price)} (${b.type==='ebook' ? 'illimité' : 'stock: '+b.stock})</option>`).join('')
-    + audios.map(a => `<option value="audio:${a.id}">${Utils.escapeHtml(a.title)} 🎧 — ${Utils.money(a.price)} (illimité)</option>`).join('');
+  const bookPicker = books.map(b => `<option value="${b.id}">${Utils.escapeHtml(b.title)} ${b.type==='ebook'?'💻':'📄'} — ${Utils.money(b.price)} (${b.type==='ebook' ? 'illimité' : 'stock: '+b.stock})</option>`).join('');
 
   return `
     <div class="page-title">
@@ -158,26 +150,12 @@ Pages.saleTotalsHtml = function (subtotal, discount, total, paid, remaining, sta
 
 Pages.addSaleItem = function () {
   const sel = document.getElementById('sale-book-picker');
-  const val = sel.value;
-  if (!val) return;
-
-  if (val.startsWith('audio:')) {
-    const audioId = val.slice(6);
-    const audio = (Pages.audioCache || []).find(a => a.id === audioId);
-    if (!audio) return;
-    const existing = Pages.saleDraft.items.find(i => i.isAudio && i.audioId === audioId);
-    if (existing) {
-      Utils.toast('Ce chapitre audio est déjà dans la vente.', 'warn');
-    } else {
-      Pages.saleDraft.items.push({ audioId, title: audio.title, price: audio.price, qty: 1, isAudio: true });
-    }
-  } else {
-    const bookId = val;
-    const book = DB.getBook(bookId);
-    const existing = Pages.saleDraft.items.find(i => i.bookId === bookId);
-    if (existing) { existing.qty += 1; }
-    else { Pages.saleDraft.items.push({ bookId, title: book.title, price: book.price, qty: 1, isEbook: DB.isEbook(book) }); }
-  }
+  const bookId = sel.value;
+  if (!bookId) return;
+  const book = DB.getBook(bookId);
+  const existing = Pages.saleDraft.items.find(i => i.bookId === bookId);
+  if (existing) { existing.qty += 1; }
+  else { Pages.saleDraft.items.push({ bookId, title: book.title, price: book.price, qty: 1, isEbook: DB.isEbook(book) }); }
   Router.render();
 };
 
@@ -221,7 +199,7 @@ Pages.saveQuickClient = function () {
   Router.render();
 };
 
-Pages.confirmSale = async function () {
+Pages.confirmSale = function () {
   const d = Pages.saleDraft;
   if (!d.clientId) { Utils.toast('Veuillez sélectionner un client.', 'err'); return; }
   if (!d.items.length) { Utils.toast('Ajoutez au moins un livre.', 'err'); return; }
@@ -243,27 +221,9 @@ Pages.confirmSale = async function () {
   }
 
   const remaining = Math.max(0, total - paid);
-  const client = DB.getClient(d.clientId);
-
-  // Pour chaque chapitre audio sélectionné, on crée automatiquement
-  // l'accès (ligne audio_purchases + access_token) via l'Edge Function,
-  // pour ne plus jamais avoir à le faire à la main dans Supabase.
-  const hasAudio = d.items.some(it => it.isAudio);
-  if (hasAudio) Utils.toast('Génération des accès audio...', 'ok');
-
-  const itemsFinal = [];
-  for (const it of d.items) {
-    if (it.isAudio) {
-      const token = await Audiobooks.generateLink(it.audioId, client ? client.name : '', client ? client.phone : '');
-      itemsFinal.push({ audioId: it.audioId, title: it.title, price: it.price, qty: it.qty, isAudio: true, accessToken: token || null });
-    } else {
-      itemsFinal.push({ bookId: it.bookId, title: it.title, price: it.price, qty: it.qty, isEbook: !!it.isEbook });
-    }
-  }
-
   const sale = {
     clientId: d.clientId,
-    items: itemsFinal,
+    items: d.items.map(it => ({ bookId: it.bookId, title: it.title, price: it.price, qty: it.qty, isEbook: !!it.isEbook })),
     subtotal, discount, total, paid, remaining,
     method: d.method,
     date: new Date(d.date).toISOString(),
@@ -290,14 +250,10 @@ Pages.receipt = function (id) {
     <tr><td>${Utils.escapeHtml(it.title)}${it.isEbook ? ' <span class="badge badge-ok" style="font-size:.6rem">E-book</span>' : ''}</td><td>${it.qty}</td><td>${Utils.money(it.price)}</td><td>${Utils.money(it.price*it.qty)}</td></tr>
   `).join('');
 
-  const ebookLinks = s.items.filter(it => it.isEbook).map(it => `
-    <div class="stock-row"><span class="text-muted">📎 ${Utils.escapeHtml(it.title)}</span><span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-sm btn-primary" onclick="Pages.downloadEbook('${s.id}','${it.bookId}')">⬇️ Télécharger mon e-book</button><button class="btn btn-sm btn-gold" onclick="Pages.watermarkEbook('${s.id}','${it.bookId}')">💧 PDF filigrané</button></span></div>
-  `).join('');
-
-  const audioLinks = s.items.filter(it => it.isAudio).map(it => it.accessToken
-    ? `<div class="stock-row"><span class="text-muted">🎧 ${Utils.escapeHtml(it.title)}</span><button class="btn btn-sm btn-primary" onclick="Pages.shareAudioLink('${it.accessToken}','${Utils.escapeHtml(it.title).replace(/'/g,"\\'")}')">📲 Envoyer le lien d'écoute</button></div>`
-    : `<div class="stock-row"><span class="text-muted">🎧 ${Utils.escapeHtml(it.title)}</span><span class="badge badge-danger">Lien non généré</span></div>`
-  ).join('');
+  const ebookLinks = s.items.filter(it => it.isEbook).map(it => {
+    const book = DB.getBook(it.bookId);
+    return (book && book.downloadLink) ? `<div class="stock-row"><span class="text-muted">📎 ${Utils.escapeHtml(it.title)}</span><a href="${Utils.escapeHtml(book.downloadLink)}" target="_blank" style="color:var(--emerald-700);font-weight:700;font-size:.8rem">Lien de téléchargement</a></div>` : '';
+  }).join('');
 
   const low = DB.data.books.filter(b => (s.items||[]).some(it=>it.bookId===b.id) && DB.bookStatus(b)!=='disponible');
   const alertHtml = low.length ? `<div class="alert-banner mt-8">⚠️ Attention : ${low.map(b=>Utils.escapeHtml(b.title)).join(', ')} — ce livre est presque en rupture de stock.</div>` : '';
@@ -344,7 +300,6 @@ Pages.receipt = function (id) {
         <div class="stock-row"><span class="text-muted">Mode de paiement</span><strong>${Utils.escapeHtml(s.method)}</strong></div>
         <div class="stock-row"><span class="text-muted">Statut</span>${Utils.statusBadge(s.status)}</div>
         ${ebookLinks}
-        ${audioLinks}
       </div>
       <div class="receipt-sign">
         <div>Signature du client<div class="line"></div></div>
@@ -357,46 +312,25 @@ Pages.receipt = function (id) {
       <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Imprimer</button>
       <button class="btn btn-outline btn-sm" onclick="Pages.copyReceipt('${s.id}')">📋 Copier</button>
       <button class="btn btn-gold btn-sm" onclick="Pages.shareReceiptWhatsApp('${s.id}')">📲 WhatsApp</button>
-      <button class="btn btn-outline btn-sm" onclick="Pages.audioModal('${s.id}')">🎧 Audio</button>
+    </div>
+    <div class="receipt-actions" style="grid-template-columns:1fr">
+      <button class="btn btn-danger btn-sm" onclick="Pages.removeSale('${s.id}')">🗑 Supprimer ce reçu / cette vente</button>
     </div>
   `;
 };
 
-Pages.audioModal = async function (saleId) {
-  Utils.openModal(`
-    <div class="modal-header"><h3>🎧 Livres audio</h3><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
-    <div id="audio-modal-list" class="text-muted" style="font-size:.85rem">Chargement...</div>
-  `);
-  const audios = await Audiobooks.listAll();
-  const holder = document.getElementById('audio-modal-list');
-  if (!holder) return;
-  if (!audios.length) {
-    holder.innerHTML = `<div class="text-muted" style="font-size:.85rem">Aucun livre audio disponible.</div>`;
-    return;
-  }
-  holder.innerHTML = audios.map(a => `
-    <div class="stock-row">
-      <span>${Utils.escapeHtml(a.title)}${a.price ? ' — ' + Utils.money(a.price) : ''}</span>
-      <button class="btn btn-sm btn-primary" onclick="Pages.audioGenerateAndShare('${saleId}','${a.id}')">Envoyer</button>
-    </div>
-  `).join('');
-};
-
-Pages.audioGenerateAndShare = async function (saleId, audioId) {
-  const s = DB.getSale(saleId);
-  const client = s ? DB.getClient(s.clientId) : null;
-  Utils.toast('Génération du lien audio...', 'ok');
-  const token = await Audiobooks.generateLink(audioId, client ? client.name : '', client ? client.phone : '');
-  if (!token) return;
-  const link = `https://dseynabou774-debug.github.io/SZA-Livres/ecouter.html?token=${token}`;
-  Utils.closeModal();
-  const text = `🎧 Voici votre lien d'écoute audio :\n${link}`;
-  if (navigator.share) {
-    try { await navigator.share({ text }); } catch(e) {}
-  } else {
-    navigator.clipboard.writeText(text).then(() => Utils.toast('Lien copié ✅')).catch(() => {});
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  }
+Pages.removeSale = function (id) {
+  const s = DB.getSale(id);
+  if (!s) return;
+  const hasPaper = s.items.some(it => { const b = DB.getBook(it.bookId); return b ? b.type !== 'ebook' : !it.isEbook; });
+  const msg = `Supprimer définitivement le reçu ${id} ?\n\n` +
+    `• La vente sera retirée des statistiques, du chiffre d'affaires et des bénéfices.\n` +
+    (hasPaper ? `• Le stock des livres papier sera remis automatiquement.\n` : '') +
+    `\nCette action est irréversible.`;
+  if (!confirm(msg)) return;
+  DB.deleteSale(id);
+  Utils.toast('Reçu supprimé, statistiques recalculées ✅');
+  Router.go('sales');
 };
 
 Pages.renderReceiptQR = function (id) {
@@ -410,41 +344,16 @@ Pages.renderReceiptQR = function (id) {
   } catch (e) { console.warn('QR non généré', e); }
 };
 
-Pages.downloadEbook = async function (saleId, bookId) {
-  const s = DB.getSale(saleId);
-  const client = s ? DB.getClient(s.clientId) : null;
-  Utils.toast('Génération du lien sécurisé...', 'ok');
-  const link = await Ebooks.generateLink(bookId, client ? client.name : '', client ? client.phone : '');
-  if (!link) return;
-  window.open(link, '_blank');
-};
-
-Pages.watermarkEbook = async function (saleId, bookId) {
-  const s = DB.getSale(saleId);
-  const client = s ? DB.getClient(s.clientId) : null;
-  if (!client) { Utils.toast('Client introuvable pour cette vente', 'err'); return; }
-  await Ebooks.sendWatermarked(bookId, client.name, client.phone || '', saleId);
-};
-
-Pages.shareAudioLink = async function (accessToken, title) {
-  const link = `https://dseynabou774-debug.github.io/SZA-Livres/ecouter.html?token=${accessToken}`;
-  const text = `🎧 ${title}\nVoici votre lien d'écoute audio :\n${link}`;
-  if (navigator.share) {
-    try { await navigator.share({ text }); } catch (e) {}
-  } else {
-    navigator.clipboard.writeText(text).then(() => Utils.toast('Lien copié ✅')).catch(() => {});
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  }
-};
-
 Pages.receiptText = function (id) {
   const s = DB.getSale(id);
   const client = DB.getClient(s.clientId);
   const set = DB.data.settings;
   const subtotal = s.subtotal != null ? s.subtotal : s.items.reduce((sum, it) => sum + it.price * it.qty, 0);
   const discount = Number(s.discount || 0);
-  const ebookLinkLines = s.items.filter(it => it.isEbook).map(it => `📎 ${it.title} : voir le bouton "Télécharger mon e-book" dans le reçu`);
-  const audioLinkLines = s.items.filter(it => it.isAudio && it.accessToken).map(it => `🎧 ${it.title} : https://dseynabou774-debug.github.io/SZA-Livres/ecouter.html?token=${it.accessToken}`);
+  const ebookLinkLines = s.items.filter(it => it.isEbook).map(it => {
+    const book = DB.getBook(it.bookId);
+    return (book && book.downloadLink) ? `📎 ${it.title} : ${book.downloadLink}` : null;
+  }).filter(Boolean);
   const lines = [
     `🧾 ${set.academyName}`,
     `${set.phone} — ${set.address}`,
@@ -461,7 +370,6 @@ Pages.receiptText = function (id) {
     `Reste à payer : ${Utils.money(s.remaining)}`,
     `Statut : ${s.status === 'Partiel' ? 'Paiement partiel' : s.status}`,
     ...(ebookLinkLines.length ? ['', ...ebookLinkLines] : []),
-    ...(audioLinkLines.length ? ['', ...audioLinkLines] : []),
     ``,
     `Merci pour votre confiance 🌿`
   ];
@@ -482,20 +390,7 @@ Pages.shareReceiptWhatsApp = async function (id) {
     const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('Blob non généré');
-    let text = Pages.receiptText(id);
-
-    const s = DB.getSale(id);
-    const client = s ? DB.getClient(s.clientId) : null;
-    const ebookItems = s ? s.items.filter(it => it.isEbook) : [];
-    if (ebookItems.length) {
-      const linkLines = [];
-      for (const it of ebookItems) {
-        const link = await Ebooks.generateLink(it.bookId, client ? client.name : '', client ? client.phone : '');
-        if (link) linkLines.push(`📎 ${it.title} : ${link}`);
-      }
-      if (linkLines.length) text += '\n\n' + linkLines.join('\n');
-    }
-
+    const text = Pages.receiptText(id);
     const file = new File([blob], `Recu_${id}.png`, { type: 'image/png' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -512,11 +407,6 @@ Pages.shareReceiptWhatsApp = async function (id) {
       Utils.toast("Image du reçu téléchargée — joignez-la à la conversation WhatsApp qui vient de s'ouvrir.", 'warn');
     }
   } catch (e) {
-    // --- BLOC DE DIAGNOSTIC AJOUTÉ ---
-    // On affiche le détail exact de l'erreur via une alerte bloquante,
-    // au lieu de la laisser disparaître dans console.error (invisible sur mobile).
-    alert('ERREUR PARTAGE : ' + (e && e.message ? e.message : JSON.stringify(e)));
-    // --- FIN DU BLOC DE DIAGNOSTIC ---
     console.error(e);
     Utils.toast("Impossible de préparer le partage. Utilisez le bouton PDF puis partagez-le manuellement.", 'err');
   }
