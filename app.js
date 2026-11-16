@@ -8,6 +8,8 @@ const NAV_ITEMS = [
   { id: 'books', label: 'Livres', icon: '📚' },
   { id: 'sales', label: 'Ventes', icon: '🧾' },
   { id: 'clients', label: 'Clients', icon: '👥' },
+  { id: 'orders', label: 'Commandes', icon: '📦' },
+  { id: 'summary', label: 'Résumé du mois', icon: '🗓️' },
   { id: 'reports', label: 'Rapports', icon: '📊' },
   { id: 'search', label: 'Recherche', icon: '🔍' },
   { id: 'backup', label: 'Sauvegarde', icon: '💾' },
@@ -51,6 +53,10 @@ const Router = {
           html = Pages.saleNew(presetClient); title = 'Nouvelle vente';
         } else { html = Pages.sales(); title = 'Ventes'; }
         break;
+      case 'summary':
+        html = Pages.summary(); title = 'Résumé du mois'; break;
+      case 'orders':
+        html = Pages.orders(); title = 'Commandes'; break;
       case 'receipt':
         html = Pages.receipt(param); title = 'Reçu'; break;
       case 'reports':
@@ -71,7 +77,6 @@ const Router = {
     App.updateFab(page);
     App.bindDynamicInputs();
     if (page === 'receipt' && param) Pages.renderReceiptQR(param);
-    if (page === 'backup') Pages.loadFilesAudit();
     window.scrollTo(0, 0);
   }
 };
@@ -80,7 +85,10 @@ const App = {
   deferredInstallPrompt: null,
 
   init() {
+    // Demande au navigateur de ne pas effacer les données de l'application
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     DB.load();
+    setTimeout(() => { try { if (window.Pages && Pages.shrinkCovers) Pages.shrinkCovers(); } catch (e) {} }, 1500);
     this.applyTheme();
     this.renderShell();
     this.checkLock();
@@ -90,10 +98,6 @@ const App = {
     window.addEventListener('hashchange', () => Router.render());
     if (!location.hash) location.hash = '#/dashboard';
     Router.render();
-
-    // Protège les fichiers e-books et vérifie qu'ils sont bien présents
-    FileStore.persist();
-    FileStore.reconcile().then(changed => { if (changed) Router.render(); }).catch(() => {});
 
     document.getElementById('btn-lock').addEventListener('click', () => this.lockNow());
   },
@@ -130,6 +134,7 @@ const App = {
             <div class="content"><div class="title">${item.label}</div></div>
           </div>`).join('')}
       </div>
+      <p class="meta" style="text-align:center;margin-top:14px">Version 14 · avec encaissement des paiements</p>
     `);
   },
 
@@ -144,6 +149,7 @@ const App = {
     const map = {
       books: () => Pages.openBookForm(),
       clients: () => Pages.openClientForm(),
+      orders: () => Orders.openForm(),
       sales: () => Router.go('sales/new')
     };
     if (map[page]) {
@@ -161,9 +167,7 @@ const App = {
       logoInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        let b64;
-        try { b64 = await Utils.compressImage(file, 400, 0.9, 'image/png'); }
-        catch (err) { Utils.toast('Image illisible.', 'err'); return; }
+        const b64 = window.shrinkImage ? await window.shrinkImage(file, 600, 0.78) : await Utils.fileToBase64(file);
         document.getElementById('logo-box').innerHTML = `<img src="${b64}"><input type="file" accept="image/*" id="logo-input">`;
         App.bindDynamicInputs();
       });
