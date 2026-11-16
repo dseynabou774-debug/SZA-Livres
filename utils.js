@@ -76,31 +76,6 @@ const Utils = {
   },
   now() { return new Date(); },
 
-  // Réduit une photo (couverture, logo) avant de la stocker. Une photo de téléphone
-  // pèse plusieurs Mo et saturerait vite le stockage local de l'application.
-  compressImage(file, maxSide = 700, quality = 0.82, type = 'image/jpeg') {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-          const w = Math.max(1, Math.round(img.width * scale));
-          const h = Math.max(1, Math.round(img.height * scale));
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          if (type === 'image/jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); }
-          ctx.drawImage(img, 0, 0, w, h);
-          URL.revokeObjectURL(url);
-          resolve(canvas.toDataURL(type, quality));
-        } catch (e) { URL.revokeObjectURL(url); reject(e); }
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')); };
-      img.src = url;
-    });
-  },
-
   uidShort() {
     return Math.random().toString(36).slice(2, 8);
   },

@@ -20,10 +20,7 @@ const DB = {
         colorEmerald: '#1d3823',
         colorGold: '#c9a15a',
         password: '',
-        passwordEnabled: false,
-        supabaseUrl: '',
-        supabaseKey: '',
-        supabaseBucket: ''
+        passwordEnabled: false
       },
       books: [],
       clients: [],
@@ -46,10 +43,6 @@ const DB = {
       this.migrate();
     } catch (e) {
       console.error('Erreur de chargement des données', e);
-      try {
-        const raw = localStorage.getItem(DB_KEY);
-        if (raw) localStorage.setItem(DB_KEY + '_illisible_' + Date.now(), raw);
-      } catch (e2) { /* ignore */ }
       this.data = this.defaultData();
     }
     return this.data;
@@ -63,16 +56,6 @@ const DB = {
       if (b.downloadLink === undefined) b.downloadLink = '';
       if (b.stock === undefined || b.stock === null) b.stock = 0;
       if (b.sold === undefined || b.sold === null) b.sold = 0;
-      // Fichiers e-book (PDF / audio) — les fichiers eux-mêmes sont dans IndexedDB
-      if (b.pdfName === undefined) b.pdfName = '';
-      if (b.pdfPath === undefined) b.pdfPath = '';
-      if (b.audioPath === undefined) b.audioPath = '';
-      if (b.pdfSize === undefined) b.pdfSize = 0;
-      if (b.audioName === undefined) b.audioName = '';
-      if (b.audioSize === undefined) b.audioSize = 0;
-      if (b.filesEnabled === undefined) b.filesEnabled = true;
-      if (b.pdfSent === undefined) b.pdfSent = 0;
-      if (b.audioSent === undefined) b.audioSent = 0;
     });
     this.data.sales.forEach(s => {
       const subtotal = (s.items || []).reduce((sum, it) => sum + Number(it.price || 0) * Number(it.qty || 0), 0);
@@ -96,25 +79,19 @@ const DB = {
     });
   },
 
-  lastSaveOk: true,
-  _quotaAlerted: false,
-
   save() {
     try {
       localStorage.setItem(DB_KEY, JSON.stringify(this.data));
       localStorage.setItem(DB_KEY + '_last_backup_at', new Date().toISOString());
-      this.lastSaveOk = true;
       return true;
     } catch (e) {
       console.error('Erreur de sauvegarde', e);
-      this.lastSaveOk = false;
       const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
-      const msg = isQuota
-        ? "⚠️ Stockage plein : vos dernières modifications ne sont PAS conservées.\n\nExportez vos données (menu Sauvegarde), puis supprimez des photos de couverture trop lourdes."
-        : "⚠️ Erreur de sauvegarde : vos dernières modifications risquent de ne pas être conservées.";
-      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(msg.split('\n')[0], 'err');
-      // Une perte de données doit être impossible à manquer : message bloquant (une fois par session)
-      if (!this._quotaAlerted && typeof alert === 'function') { this._quotaAlerted = true; alert(msg); }
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast(isQuota
+          ? "Stockage plein : exportez vos données (Sauvegarde) puis réduisez la taille/nombre des photos de couverture."
+          : "Erreur de sauvegarde locale. Vos dernières modifications risquent de ne pas être conservées.", 'err');
+      }
       return false;
     }
   },
@@ -214,18 +191,12 @@ const DB = {
       });
     }
     this.data.sales = this.data.sales.filter(x => x.id !== id);
-    if (sale) {
-      const client = this.getClient(sale.clientId);
-      if (client) {
-        const left = this.data.sales.filter(x => x.clientId === client.id).sort((a, b) => new Date(b.date) - new Date(a.date));
-        client.lastPurchaseDate = left.length ? left[0].date : undefined;
-      }
-    }
     this.save();
   },
   getSale(id) {
     return this.data.sales.find(x => x.id === id);
   },
+
   // ---------- Paiements ----------
   // Recalcule montant payé / reste / statut à partir de l'historique des paiements
   _recomputeSale(s) {
@@ -261,33 +232,11 @@ const DB = {
     return s;
   },
 
-  // Enregistre l'envoi d'un fichier (PDF ou audio) à un client
-  registerDelivery(saleId, bookId, kind) {
-    const sale = this.getSale(saleId);
-    const book = this.getBook(bookId);
-    if (sale) {
-      sale.deliveries = sale.deliveries || [];
-      sale.deliveries.push({ bookId, kind, at: new Date().toISOString() });
-    }
-    if (book) {
-      if (kind === 'audio') book.audioSent = (book.audioSent || 0) + 1;
-      else book.pdfSent = (book.pdfSent || 0) + 1;
-    }
-    this.save();
-  },
-  totalDeliveries() {
-    return this.data.books.reduce((acc, b) => {
-      acc.pdf += Number(b.pdfSent || 0);
-      acc.audio += Number(b.audioSent || 0);
-      return acc;
-    }, { pdf: 0, audio: 0 });
-  },
-
   // ---------- Aggregates ----------
   // Core stats engine — reusable for global totals, date-filtered reports,
   // and per-type (papier / ebook) breakdowns, so all screens stay consistent.
   computeSalesStats(salesArr) {
-    let revenue = 0, profit = 0, discount = 0;
+    let revenue = 0, profit = 0, paidProfit = 0, discount = 0;
     let papierRevenue = 0, ebookRevenue = 0, papierProfit = 0, ebookProfit = 0;
     let papierQty = 0, ebookQty = 0;
     let paidCount = 0, partialCount = 0, pendingCount = 0, totalRemaining = 0;
@@ -317,6 +266,7 @@ const DB = {
         const itemProfit = itemTotal - itemCost;
         const itemPaidShare = paid * share;
         profit += itemProfit;
+        paidProfit += itemProfit * (total > 0 ? Math.min(1, paid / total) : 0);
         if (isEbook) {
           ebookRevenue += itemPaidShare; ebookProfit += itemProfit; ebookQty += Number(item.qty || 0);
         } else {
@@ -326,7 +276,7 @@ const DB = {
     });
 
     return {
-      revenue, profit, discount,
+      revenue, profit, paidProfit, discount,
       papierRevenue, ebookRevenue, papierProfit, ebookProfit, papierQty, ebookQty,
       paidCount, partialCount, pendingCount, totalRemaining
     };
@@ -343,7 +293,7 @@ const DB = {
     const stats = this.computeSalesStats(this.data.sales);
     return {
       totalBooks, inStock, sold, papierSold, ebookSold,
-      revenue: stats.revenue, profit: stats.profit, totalDiscounts: stats.discount,
+      revenue: stats.revenue, profit: stats.profit, paidProfit: stats.paidProfit, totalDiscounts: stats.discount,
       papierRevenue: stats.papierRevenue, ebookRevenue: stats.ebookRevenue,
       papierProfit: stats.papierProfit, ebookProfit: stats.ebookProfit,
       pending: stats.pendingCount, partial: stats.partialCount, totalRemaining: stats.totalRemaining

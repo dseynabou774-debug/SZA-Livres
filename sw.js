@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sza-livres-v7';
+const CACHE_NAME = 'sza-livres-v14';
 const ASSETS = [
   './',
   './index.html',
@@ -6,9 +6,11 @@ const ASSETS = [
   './style.css',
   './db.js',
   './utils.js',
-  './files.js',
   './pages.js',
   './pages2.js',
+  './orders.js',
+  './summary.js',
+  './watermark.js',
   './app.js',
   './icon-192.png',
   './icon-512.png',
@@ -32,26 +34,31 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: cache-first for app shell, network-first fallback to cache for others
+// Fetch: réseau d'abord (toujours la dernière version), cache si pas de connexion
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const fetchPromise = fetch(req)
-        .then((networkResponse) => {
-          const sameOrigin = req.url.startsWith(self.location.origin);
-          // Les bibliothèques externes (PDF, QR code, polices) sont aussi gardées pour le mode hors-ligne
-          const cdn = /^https:\/\/(cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)\//.test(req.url);
-          if (networkResponse && ((sameOrigin && networkResponse.status === 200) || (cdn && (networkResponse.status === 200 || networkResponse.type === 'opaque')))) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
-          }
-          return networkResponse;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
+    new Promise((resolve) => {
+      let done = false;
+      const useCache = () => caches.match(req).then((c) => {
+        if (!done && c) { done = true; resolve(c); }
+      });
+      const timer = setTimeout(useCache, 4000); // réseau trop lent : on prend le cache
+      fetch(req).then((res) => {
+        clearTimeout(timer);
+        if (res && res.status === 200 && req.url.startsWith(self.location.origin)) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+        }
+        if (!done) { done = true; resolve(res); }
+      }).catch(() => {
+        clearTimeout(timer);
+        caches.match(req).then((c) => {
+          if (!done) { done = true; resolve(c || Response.error()); }
+        });
+      });
     })
   );
 });
