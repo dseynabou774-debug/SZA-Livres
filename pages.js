@@ -206,7 +206,7 @@ Pages.books = function (query = '', typeFilter = 'all') {
   return `
     <div class="page-title">
       <div><span class="eyebrow">Catalogue</span><h2>Gestion des livres</h2></div>
-      ${addBtn}
+      <div class="tag-row" style="gap:8px">${addBtn}<button class="btn btn-gold btn-sm" onclick="Router.go('catalog')">🛍️ Boutique</button></div>
     </div>
     <div class="search-bar">
       <span class="ic">🔍</span>

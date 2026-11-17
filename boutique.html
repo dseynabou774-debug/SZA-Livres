@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Boutique — Seyda Zeynab Academy</title>
+<meta name="description" content="Découvrez les livres, e-books et audios de Seyda Zeynab Academy et commandez directement sur WhatsApp.">
+<meta name="theme-color" content="#1d3823">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--em:#1d3823;--em2:#2c5d38;--gold:#c9a15a;--gold2:#e3c687;--cream:#f6f1e4;--cream2:#ece3cd;--ink:#22281f;--soft:#6b6455;--red:#a13f30;--r:16px}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--cream);color:var(--ink);min-height:100vh;padding-bottom:24px}
+body.has-bar{padding-bottom:96px}
+h1,h2,h3,.serif{font-family:'Playfair Display',Georgia,'Times New Roman',serif}
+button{font-family:inherit;cursor:pointer;border:none}
+input,textarea{font-family:inherit}
+.top{background:linear-gradient(135deg,var(--em2),var(--em));color:#fff;padding:calc(14px + env(safe-area-inset-top)) 18px 16px;box-shadow:0 4px 18px rgba(29,56,35,.2)}
+.brand{display:flex;align-items:center;gap:12px;max-width:1000px;margin:0 auto}
+.logo{width:56px;height:56px;border-radius:50%;background:#fff;object-fit:cover;box-shadow:0 0 0 2px var(--gold);flex-shrink:0}
+.brand h1{font-size:1.15rem;line-height:1.2}
+.brand p{font-size:.72rem;color:var(--gold2);letter-spacing:.4px;margin-top:2px}
+.preview{background:#fff3cd;color:#664d03;font-size:.8rem;padding:10px 16px;text-align:center}
+main{max-width:1000px;margin:0 auto;padding:18px 16px}
+.hero{text-align:center;margin:6px 0 16px}
+.hero h2{font-size:1.45rem;color:var(--em)}
+.hero p{font-size:.9rem;color:var(--soft);margin-top:6px}
+.tools{margin-bottom:16px}
+#q{width:100%;padding:12px 16px;border-radius:999px;border:1.5px solid var(--cream2);background:#fff;font-size:.95rem;outline:none}
+#q:focus{border-color:var(--em2)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.chip{padding:8px 14px;border-radius:999px;background:#fff;color:var(--soft);font-size:.82rem;font-weight:700;border:1.5px solid var(--cream2)}
+.chip.on{background:var(--em);color:#fff;border-color:var(--em)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(min-width:640px){.grid{grid-template-columns:repeat(3,1fr);gap:16px}}
+@media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card{background:#fff;border-radius:var(--r);box-shadow:0 4px 18px rgba(29,56,35,.1);overflow:hidden;display:flex;flex-direction:column}
+.cover{position:relative;aspect-ratio:3/4;background:var(--cream2);cursor:pointer;overflow:hidden}
+.cover img{width:100%;height:100%;object-fit:cover;display:block}
+.ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;background:linear-gradient(135deg,var(--cream2),#fff)}
+.tag{position:absolute;top:8px;left:8px;background:rgba(29,56,35,.88);color:#fff;font-size:.66rem;font-weight:700;padding:4px 9px;border-radius:999px}
+.ribbon{position:absolute;bottom:8px;left:8px;right:8px;background:rgba(161,63,48,.92);color:#fff;font-size:.74rem;font-weight:700;text-align:center;padding:5px;border-radius:8px}
+.card.out .cover img,.card.out .ph{filter:grayscale(1);opacity:.6}
+.body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.body h3{font-size:.92rem;line-height:1.25;color:var(--em);cursor:pointer}
+.au{font-size:.72rem;color:var(--soft)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.price{font-weight:800;color:#a67c2a;font-size:.95rem}
+.lim{font-size:.64rem;font-weight:700;color:#a8791f;background:rgba(168,121,31,.12);padding:2px 8px;border-radius:999px}
+.btn{width:100%;padding:10px 12px;border-radius:999px;font-weight:700;font-size:.85rem;background:var(--cream);color:var(--em);border:1.5px solid var(--em2);margin-top:auto}
+.btn.gold{background:linear-gradient(135deg,var(--gold2),var(--gold));color:var(--em);border:none}
+.btn.main{background:linear-gradient(135deg,var(--em2),var(--em));color:#fff;border:none}
+.btn.on{background:rgba(44,93,56,.1);color:var(--em2)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.step{display:flex;align-items:center;justify-content:space-between;background:var(--cream);border:1.5px solid var(--em2);border-radius:999px;margin-top:auto;overflow:hidden}
+.step button{width:42px;height:38px;background:transparent;font-size:1.2rem;font-weight:700;color:var(--em)}
+.step span{font-weight:800;color:var(--em)}
+.state{text-align:center;padding:40px 16px;color:var(--soft)}
+.state .big{font-size:2.6rem;margin-bottom:8px}
+.updated{text-align:center;font-size:.72rem;color:var(--soft);margin-top:20px}
+footer{max-width:1000px;margin:0 auto;padding:6px 16px 10px;text-align:center;font-size:.8rem;color:var(--soft);line-height:1.6}
+footer .note{background:#fff;border-radius:var(--r);padding:12px 14px;margin-bottom:10px;border:1px solid var(--cream2);color:var(--ink)}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--cream2);box-shadow:0 -6px 20px rgba(29,56,35,.14);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px}
+.bar .sum{flex:1;font-size:.82rem;color:var(--soft)}
+.bar .sum strong{display:block;color:var(--em);font-size:1.02rem}
+.bar button{padding:12px 20px;width:auto;margin:0}
+.ov{position:fixed;inset:0;background:rgba(20,38,26,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:700px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;border-radius:22px 22px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom))}
+@media(min-width:700px){.sheet{border-radius:var(--r)}}
+.sh-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sh-h h3{font-size:1.15rem;color:var(--em)}
+.x{width:34px;height:34px;border-radius:50%;background:var(--cream);color:var(--soft);font-size:1rem}
+.big-cover{width:100%;max-height:360px;object-fit:contain;background:var(--cream2);border-radius:12px;margin-bottom:12px}
+.desc{white-space:pre-line;font-size:.9rem;line-height:1.55;margin:10px 0}
+.info{font-size:.8rem;color:var(--soft);background:var(--cream);border-radius:10px;padding:9px 12px;margin:10px 0}
+.line{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--cream2)}
+.line .t{flex:1;font-size:.88rem;font-weight:600;color:var(--em)}
+.line .t small{display:block;font-weight:400;color:var(--soft)}
+.line .step{width:104px;margin:0}
+.line .step button{width:32px;height:32px}
+.total{display:flex;justify-content:space-between;font-weight:800;font-size:1.1rem;color:var(--em);padding:12px 0}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:.78rem;font-weight:700;color:var(--em);margin-bottom:5px}
+.fg input,.fg textarea{width:100%;padding:12px 13px;border-radius:10px;border:1.5px solid var(--cream2);background:var(--cream);font-size:.95rem;outline:none}
+.fg input:focus,.fg textarea:focus{border-color:var(--em2);background:#fff}
+.err{color:var(--red);font-size:.8rem;margin:4px 0 8px;min-height:1em}
+.wa{background:#1f9d55;color:#fff;border:none;margin-top:6px}
+.sec{background:transparent;color:var(--soft);border:none;margin-top:6px}
+noscript{display:block;text-align:center;padding:30px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="logo.png" alt="Logo">
+    <div><h1 id="shop-name">Seyda Zeynab Academy</h1><p id="shop-tagline">Savoir utile pour une vie meilleure</p></div>
+  </div>
+</header>
+<div id="preview" class="preview" hidden>👁 Aperçu : visible uniquement sur ce téléphone. Vos clients verront la boutique après la publication du catalogue.</div>
+<main>
+  <section class="hero"><h2>Nos livres, e-books et audios</h2><p>Choisissez vos articles, puis envoyez votre commande directement sur WhatsApp.</p></section>
+  <div class="tools"><input id="q" type="search" placeholder="Rechercher un titre, un auteur…" aria-label="Rechercher"><div id="chips" class="chips"></div></div>
+  <div id="grid" class="grid"></div>
+  <div id="state" class="state"><div class="big">📚</div><p>Chargement de la boutique…</p></div>
+  <p id="updated" class="updated"></p>
+</main>
+<footer><div id="note" class="note" hidden></div><div id="contact"></div></footer>
+<div id="bar" class="bar" hidden><div class="sum"><span id="bar-count"></span><strong id="bar-total"></strong></div><button id="bar-go" class="btn main">Commander</button></div>
+<div id="root"></div>
+<noscript>Cette boutique nécessite JavaScript.</noscript>
+
+<script>
+(function () {
+  'use strict';
+  var DEFAULT_WA = '221764279847';
+  var TYPES = {
+    papier: { ico: '📚', short: 'Livre', label: 'Livre papier', info: 'Livre papier : livraison à votre adresse après confirmation de la commande.' },
+    ebook:  { ico: '💻', short: 'E-book PDF', label: 'E-book (PDF)', info: 'E-book au format PDF : envoyé sur WhatsApp après paiement.' },
+    audio:  { ico: '🎧', short: 'Audio', label: 'Audio', info: "Version audio : le lien d'écoute vous est envoyé sur WhatsApp après paiement." }
+  };
+  var PLURAL = { papier: 'Livres papier', ebook: 'E-books', audio: 'Audios' };
+  var S = { items: [], shop: {}, wa: DEFAULT_WA, filter: 'all', q: '', cart: {} };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(n) { return Math.round(Number(n) || 0).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ') + ' FCFA'; }
+  function safeSrc(u) {
+    u = String(u || '');
+    if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(u)) return u;
+    if (/^https:\/\/[^\s"'<>]+$/.test(u) || /^[\w.\/-]+$/.test(u)) return u;
+    return '';
+  }
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+  function read(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function typeOf(it) { return TYPES[it.type] || TYPES.papier; }
+  function byId(id) { for (var i = 0; i < S.items.length; i++) if (S.items[i].id === id) return S.items[i]; return null; }
+  function isOut(it) { return it.status === 'rupture'; }
+  function maxQty(it) { return it.type === 'papier' ? 20 : 1; }
+
+  /* ---------- chargement ---------- */
+  function buildPreview() {
+    var db = JSON.parse(localStorage.getItem('sza_livres_db_v1') || 'null');
+    if (!db) throw new Error('no data');
+    var set = db.settings || {};
+    var items = (db.books || []).filter(function (b) { return b.shop !== false; }).map(function (b) {
+      var st = 'disponible';
+      if (b.type !== 'ebook') st = (Number(b.stock) <= 0) ? 'rupture' : (Number(b.stock) <= Number(b.minAlert || 0) ? 'limite' : 'disponible');
+      return { id: b.id, type: b.type === 'ebook' ? 'ebook' : 'papier', title: b.title, author: b.author, category: b.category, description: b.description, price: b.price, status: st, cover: b.cover };
+    });
+    return { generatedAt: new Date().toISOString(), shop: { name: set.academyName, tagline: set.tagline, whatsapp: String(set.shopWhatsapp || DEFAULT_WA).replace(/\D/g, ''), phone: set.phone, address: set.address, note: set.shopNote }, items: items };
+  }
+  function load() {
+    if (/[?&]apercu=1/.test(location.search)) {
+      $('preview').hidden = false;
+      try { return Promise.resolve(buildPreview()); } catch (e) { return Promise.reject(e); }
+    }
+    return fetch('catalogue.json?v=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    });
+  }
+
+  function apply(data) {
+    S.shop = data.shop || {};
+    S.items = (data.items || []).filter(function (it) { return it && it.id && it.title; });
+    var wa = String(S.shop.whatsapp || '').replace(/\D/g, '');
+    S.wa = wa || DEFAULT_WA;
+    if (S.shop.name) { $('shop-name').textContent = S.shop.name; document.title = 'Boutique — ' + S.shop.name; }
+    if (S.shop.tagline) $('shop-tagline').textContent = S.shop.tagline;
+    if (S.shop.note) { $('note').textContent = S.shop.note; $('note').hidden = false; }
+    var c = [];
+    if (S.shop.phone) c.push('📞 ' + esc(S.shop.phone));
+    if (S.shop.address) c.push('📍 ' + esc(S.shop.address));
+    $('contact').innerHTML = c.join(' · ');
+    if (data.generatedAt) {
+      var d = new Date(data.generatedAt);
+      if (!isNaN(d)) $('updated').textContent = 'Catalogue mis à jour le ' + d.toLocaleDateString('fr-FR');
+    }
+    // panier mémorisé : on ne garde que les articles qui existent encore et sont disponibles
+    var saved = read('sza_boutique_cart') || {};
+    S.cart = {};
+    Object.keys(saved).forEach(function (id) {
+      var it = byId(id);
+      if (it && !isOut(it) && saved[id] > 0) S.cart[id] = Math.min(maxQty(it), Math.floor(saved[id]));
+    });
+  }
+
+  /* ---------- panier ---------- */
+  function cartLines() {
+    return Object.keys(S.cart).map(function (id) { var it = byId(id); return it ? { it: it, qty: S.cart[id] } : null; }).filter(Boolean);
+  }
+  function cartTotal() { return cartLines().reduce(function (s, l) { return s + l.it.price * l.qty; }, 0); }
+  function cartCount() { return cartLines().reduce(function (s, l) { return s + l.qty; }, 0); }
+  function setQty(id, q) {
+    var it = byId(id); if (!it || isOut(it)) return;
+    q = Math.max(0, Math.min(maxQty(it), q));
+    if (q === 0) delete S.cart[id]; else S.cart[id] = q;
+    store('sza_boutique_cart', S.cart);
+    render(); bar();
+  }
+
+  /* ---------- affichage ---------- */
+  function filtered() {
+    var q = S.q.trim().toLowerCase();
+    return S.items.filter(function (it) {
+      if (S.filter !== 'all' && it.type !== S.filter) return false;
+      if (!q) return true;
+      return (it.title + ' ' + (it.author || '') + ' ' + (it.category || '')).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  function chips() {
+    var present = {}; S.items.forEach(function (it) { present[it.type] = true; });
+    var list = [['all', 'Tous']];
+    ['papier', 'ebook', 'audio'].forEach(function (t) { if (present[t]) list.push([t, TYPES[t].ico + ' ' + PLURAL[t]]); });
+    $('chips').innerHTML = list.length > 2 ? list.map(function (c) { return '<button class="chip' + (S.filter === c[0] ? ' on' : '') + '" data-f="' + c[0] + '">' + esc(c[1]) + '</button>'; }).join('') : '';
+  }
+  function actionHtml(it) {
+    if (isOut(it)) return '<button class="btn" disabled>Indisponible</button>';
+    var q = S.cart[it.id] || 0;
+    if (!q) return '<button class="btn gold" data-act="add">+ Ajouter</button>';
+    if (it.type === 'papier') return '<div class="step"><button data-act="dec" aria-label="Moins">−</button><span>' + q + '</span><button data-act="inc" aria-label="Plus">+</button></div>';
+    return '<button class="btn on" data-act="rm">✓ Ajouté — retirer</button>';
+  }
+  function render() {
+    chips();
+    var list = filtered();
+    $('grid').innerHTML = list.map(function (it) {
+      var t = typeOf(it), src = safeSrc(it.cover), out = isOut(it);
+      return '<article class="card' + (out ? ' out' : '') + '" data-id="' + esc(it.id) + '">' +
+        '<div class="cover" data-act="open">' + (src ? '<img loading="lazy" alt="' + esc(it.title) + '" src="' + esc(src) + '">' : '<div class="ph">' + t.ico + '</div>') +
+        '<span class="tag">' + t.ico + ' ' + esc(t.short) + '</span>' + (out ? '<span class="ribbon">Rupture de stock</span>' : '') + '</div>' +
+        '<div class="body"><h3 data-act="open">' + esc(it.title) + '</h3>' + (it.author ? '<p class="au">' + esc(it.author) + '</p>' : '') +
+        '<div class="row"><span class="price">' + money(it.price) + '</span>' + (it.status === 'limite' ? '<span class="lim">Dernières unités</span>' : '') + '</div>' +
+        actionHtml(it) + '</div></article>';
+    }).join('');
+    var st = $('state');
+    if (!S.items.length) { st.hidden = false; st.innerHTML = '<div class="big">📚</div><p>La boutique est en préparation. Revenez bientôt, in châ Allah.</p>'; }
+    else if (!list.length) { st.hidden = false; st.innerHTML = '<div class="big">🔍</div><p>Aucun article ne correspond à votre recherche.</p>'; }
+    else st.hidden = true;
+  }
+  function bar() {
+    var n = cartCount();
+    $('bar').hidden = n === 0;
+    document.body.classList.toggle('has-bar', n > 0);
+    $('bar-count').textContent = n + ' article' + (n > 1 ? 's' : '') + ' dans votre panier';
+    $('bar-total').textContent = money(cartTotal());
+  }
+
+  /* ---------- fenêtres ---------- */
+  function closeSheet() { $('root').innerHTML = ''; }
+  function sheet(inner) {
+    $('root').innerHTML = '<div class="ov" id="ov"><div class="sheet">' + inner + '</div></div>';
+    $('ov').addEventListener('click', function (e) { if (e.target.id === 'ov') closeSheet(); });
+  }
+  function openDetail(id) {
+    var it = byId(id); if (!it) return;
+    var t = typeOf(it), src = safeSrc(it.cover);
+    var q = S.cart[id] || 0;
+    var act = isOut(it) ? '<button class="btn" disabled>Indisponible</button>'
+      : (q ? (it.type === 'papier' ? '<div class="step"><button data-d="dec">−</button><span>' + q + '</span><button data-d="inc">+</button></div>' : '<button class="btn on" data-d="rm">✓ Ajouté — retirer</button>')
+           : '<button class="btn gold" data-d="add">+ Ajouter à ma commande</button>');
+    sheet('<div class="sh-h"><h3>' + esc(it.title) + '</h3><button class="x" data-d="close" aria-label="Fermer">✕</button></div>' +
+      (src ? '<img class="big-cover" src="' + esc(src) + '" alt="' + esc(it.title) + '">' : '') +
+      (it.author ? '<p class="au">' + esc(it.author) + (it.category ? ' · ' + esc(it.category) : '') + '</p>' : '') +
+      '<p class="price" style="font-size:1.2rem;margin-top:6px">' + money(it.price) + (it.duration ? ' · ' + it.duration + ' min' : '') + '</p>' +
+      (it.description ? '<p class="desc">' + esc(it.description) + '</p>' : '') +
+      '<div class="info">' + t.ico + ' ' + esc(t.info) + '</div>' + act);
+    $('root').onclick = function (e) {
+      var b = e.target.closest('[data-d]'); if (!b) return;
+      var a = b.getAttribute('data-d');
+      if (a === 'close') return closeSheet();
+      if (a === 'add') setQty(id, 1); if (a === 'inc') setQty(id, (S.cart[id] || 0) + 1);
+      if (a === 'dec') setQty(id, (S.cart[id] || 0) - 1); if (a === 'rm') setQty(id, 0);
+      openDetail(id);
+    };
+  }
+
+  function needsAddress() { return cartLines().some(function (l) { return l.it.type === 'papier'; }); }
+  function openCheckout() {
+    var lines = cartLines();
+    if (!lines.length) return closeSheet();
+    var me = read('sza_boutique_client') || {};
+    var rows = lines.map(function (l) {
+      var it = l.it;
+      var ctl = it.type === 'papier'
+        ? '<div class="step"><button data-c="dec" data-id="' + esc(it.id) + '">−</button><span>' + l.qty + '</span><button data-c="inc" data-id="' + esc(it.id) + '">+</button></div>'
+        : '<button class="x" data-c="rm" data-id="' + esc(it.id) + '" aria-label="Retirer">✕</button>';
+      return '<div class="line"><div class="t">' + esc(it.title) + '<small>' + esc(typeOf(it).label) + ' · ' + money(it.price) + '</small></div>' + ctl + '</div>';
+    }).join('');
+    var addr = needsAddress();
+    sheet('<div class="sh-h"><h3>Ma commande</h3><button class="x" data-c="close" aria-label="Fermer">✕</button></div>' + rows +
+      '<div class="total"><span>Total</span><span>' + money(cartTotal()) + '</span></div>' +
+      '<div class="fg"><label for="f-name">Votre nom *</label><input id="f-name" autocomplete="name" value="' + esc(me.name) + '"></div>' +
+      '<div class="fg"><label for="f-phone">Votre numéro WhatsApp *</label><input id="f-phone" type="tel" autocomplete="tel" placeholder="77 123 45 67" value="' + esc(me.phone) + '"></div>' +
+      '<div class="fg"><label for="f-city">' + (addr ? 'Ville et adresse de livraison *' : 'Ville / pays (facultatif)') + '</label><input id="f-city" autocomplete="street-address" value="' + esc(me.city) + '"></div>' +
+      '<div class="fg"><label for="f-note">Remarque (facultatif)</label><textarea id="f-note" rows="2"></textarea></div>' +
+      '<p class="err" id="f-err"></p>' +
+      '<button class="btn wa" data-c="send">📲 Envoyer ma commande sur WhatsApp</button>' +
+      '<button class="btn sec" data-c="copy">📋 Copier ma commande</button>');
+    $('root').onclick = function (e) {
+      var b = e.target.closest('[data-c]'); if (!b) return;
+      var a = b.getAttribute('data-c'), id = b.getAttribute('data-id');
+      if (a === 'close') return closeSheet();
+      if (a === 'inc') { setQty(id, (S.cart[id] || 0) + 1); return openCheckout(); }
+      if (a === 'dec') { setQty(id, (S.cart[id] || 0) - 1); return openCheckout(); }
+      if (a === 'rm') { setQty(id, 0); return openCheckout(); }
+      if (a === 'send' || a === 'copy') submit(a);
+    };
+  }
+
+  function message(f) {
+    var L = ['Assalamou alaykoum 🌿', 'Je souhaite commander :', ''];
+    cartLines().forEach(function (l) { L.push('• ' + l.qty + ' × ' + l.it.title + ' (' + typeOf(l.it).label + ') — ' + money(l.it.price * l.qty)); });
+    L.push('', 'Total : ' + money(cartTotal()), '', 'Nom : ' + f.name, 'Téléphone : ' + f.phone);
+    if (f.city) L.push((needsAddress() ? 'Livraison : ' : 'Ville : ') + f.city);
+    if (f.note) L.push('Remarque : ' + f.note);
+    L.push('', 'Commande passée depuis la boutique en ligne.');
+    return L.join('\n');
+  }
+  function submit(mode) {
+    var f = { name: $('f-name').value.trim(), phone: $('f-phone').value.trim(), city: $('f-city').value.trim(), note: $('f-note').value.trim() };
+    var err = '';
+    if (!f.name) err = 'Merci de saisir votre nom.';
+    else if (f.phone.replace(/\D/g, '').length < 8) err = 'Merci de saisir un numéro WhatsApp valide.';
+    else if (needsAddress() && !f.city) err = 'Merci de saisir votre ville et votre adresse de livraison.';
+    $('f-err').textContent = err;
+    if (err) return;
+    store('sza_boutique_client', { name: f.name, phone: f.phone, city: f.city });
+    var text = message(f);
+    if (mode === 'copy') {
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { $('f-err').style.color = '#2c5d38'; $('f-err').textContent = 'Commande copiée ✅'; }, function () { $('f-err').textContent = 'Copie impossible.'; });
+      return;
+    }
+    var url = 'https://wa.me/' + S.wa + '?text=' + encodeURIComponent(text);
+    var w = window.open(url, '_blank');
+    if (!w) window.location.href = url;
+    sheet('<div class="sh-h"><h3>Merci ! 🌿</h3><button class="x" data-c="close" aria-label="Fermer">✕</button></div>' +
+      '<p class="desc">Votre commande est prête dans WhatsApp : appuyez sur « Envoyer » pour la transmettre. Nous vous répondons pour confirmer le paiement et la livraison.</p>' +
+      '<button class="btn gold" data-c="again">Passer une autre commande</button><button class="btn sec" data-c="back">Revenir à la boutique</button>');
+    $('root').onclick = function (e) {
+      var b = e.target.closest('[data-c]'); if (!b) return;
+      var a = b.getAttribute('data-c');
+      if (a === 'again') { S.cart = {}; store('sza_boutique_cart', S.cart); render(); bar(); }
+      closeSheet();
+    };
+  }
+
+  /* ---------- événements ---------- */
+  $('q').addEventListener('input', function () { S.q = this.value; render(); });
+  $('chips').addEventListener('click', function (e) { var b = e.target.closest('[data-f]'); if (b) { S.filter = b.getAttribute('data-f'); render(); } });
+  $('grid').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var card = b.closest('.card'); if (!card) return;
+    var id = card.getAttribute('data-id'), a = b.getAttribute('data-act');
+    if (a === 'open') return openDetail(id);
+    if (a === 'add') setQty(id, 1);
+    if (a === 'inc') setQty(id, (S.cart[id] || 0) + 1);
+    if (a === 'dec') setQty(id, (S.cart[id] || 0) - 1);
+    if (a === 'rm') setQty(id, 0);
+  });
+  $('bar-go').addEventListener('click', openCheckout);
+
+  load().then(function (data) { apply(data); render(); bar(); })
+    .catch(function () {
+      $('state').hidden = false;
+      $('state').innerHTML = '<div class="big">📚</div><p>La boutique est en préparation. Revenez bientôt, in châ Allah.</p>';
+    });
+})();
+</script>
+</body>
+</html>

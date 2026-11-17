@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sza-livres-v14';
+const CACHE_NAME = 'sza-livres-v15';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './pages.js',
   './pages2.js',
   './orders.js',
+  './catalog.js',
   './summary.js',
   './watermark.js',
   './app.js',

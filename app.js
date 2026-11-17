@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { id: 'sales', label: 'Ventes', icon: '🧾' },
   { id: 'clients', label: 'Clients', icon: '👥' },
   { id: 'orders', label: 'Commandes', icon: '📦' },
+  { id: 'catalog', label: 'Boutique clients', icon: '🛍️' },
   { id: 'summary', label: 'Résumé du mois', icon: '🗓️' },
   { id: 'reports', label: 'Rapports', icon: '📊' },
   { id: 'search', label: 'Recherche', icon: '🔍' },
@@ -55,6 +56,8 @@ const Router = {
         break;
       case 'summary':
         html = Pages.summary(); title = 'Résumé du mois'; break;
+      case 'catalog':
+        html = Pages.catalog(); title = 'Boutique clients'; break;
       case 'orders':
         html = Pages.orders(); title = 'Commandes'; break;
       case 'receipt':
@@ -134,7 +137,7 @@ const App = {
             <div class="content"><div class="title">${item.label}</div></div>
           </div>`).join('')}
       </div>
-      <p class="meta" style="text-align:center;margin-top:14px">Version 14 · avec encaissement des paiements</p>
+      <p class="meta" style="text-align:center;margin-top:14px">Version 15 · avec boutique clients</p>
     `);
   },
 
