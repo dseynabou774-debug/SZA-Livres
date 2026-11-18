@@ -41,6 +41,76 @@ Catalog.thumb = async function (cover) {
   try { return (await window.shrinkImage(cover, 420, 0.7)) || ''; } catch (e) { return ''; }
 };
 
+// ---------- Audios : un seul produit par livre ----------
+// Les chapitres d'un même livre (« Chapitre 2 … », « Chapitre 8 et Fin du livre … »)
+// sont regroupés en un seul audio dans la boutique.
+Catalog.CHAPTER_RE = /^\s*(chapitre|chap\.?|partie)\s*\d+\s*(et\s+fin(\s+du\s+livre)?)?\s*[:\-–—.]*\s*/i;
+
+Catalog.normKey = function (title) {
+  let t = String(title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  t = t.replace(Catalog.CHAPTER_RE, '');
+  return t.replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').trim();
+};
+Catalog.cleanTitle = function (title) {
+  const t = String(title || '').replace(Catalog.CHAPTER_RE, '').trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+Catalog.hash = function (s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+};
+Catalog.groupCfg = function (id) {
+  return (DB.data.settings.shopAudioGroups || {})[id] || {};
+};
+
+Catalog.audioGroups = function (audios) {
+  const map = {}, order = [];
+  (audios || []).forEach(a => {
+    if (a.active === false) return;
+    const key = Catalog.normKey(a.title);
+    if (!key) return;
+    if (!map[key]) { map[key] = { key, id: 'AG' + Catalog.hash(key), members: [] }; order.push(key); }
+    map[key].members.push(a);
+  });
+  return order.map(k => {
+    const g = map[k], m = g.members;
+    g.title = m.map(a => Catalog.cleanTitle(a.title)).sort((x, y) => x.length - y.length)[0];
+    g.count = m.length;
+    g.sum = m.reduce((s, a) => s + (Number(a.price) || 0), 0);
+    g.minutes = Math.round(m.reduce((s, a) => s + (Number(a.duration_seconds) || 0), 0) / 60);
+    g.language = [...new Set(m.map(a => String(a.language || '').trim()).filter(Boolean))].join(', ');
+    g.description = ((m.find(a => a.description && String(a.description).trim()) || {}).description || '').trim();
+    const cfg = Catalog.groupCfg(g.id);
+    g.show = cfg.show !== false;
+    g.price = (cfg.price !== undefined && cfg.price !== null && cfg.price !== '') ? Number(cfg.price) : g.sum;
+    return g;
+  });
+};
+
+// L'audio reprend la couverture du livre du même titre
+Catalog.coverFor = async function (key) {
+  const b = DB.data.books.find(x => x.cover && Catalog.normKey(x.title) === key);
+  return b ? await Catalog.thumb(b.cover) : '';
+};
+
+Catalog.toggleAudioGroup = function (id, on) {
+  const all = DB.data.settings.shopAudioGroups = DB.data.settings.shopAudioGroups || {};
+  all[id] = Object.assign({}, all[id], { show: !!on });
+  DB.save(); Router.render();
+};
+Catalog.setAudioPrice = function (id, value) {
+  const all = DB.data.settings.shopAudioGroups = DB.data.settings.shopAudioGroups || {};
+  const v = String(value).trim();
+  all[id] = Object.assign({}, all[id], { price: v === '' ? undefined : Math.max(0, Math.round(Number(v) || 0)) });
+  DB.save(); Router.render();
+};
+Catalog.loadAudios = async function () {
+  Utils.toast('Chargement de vos audios…');
+  try { await Pages.loadAudioCache(true); Router.render(); }
+  catch (e) { Utils.toast("Impossible de charger les audios (connexion admin ?).", 'err'); }
+};
+
 Catalog.build = async function () {
   const set = DB.data.settings;
   const items = [];
@@ -64,22 +134,25 @@ Catalog.build = async function () {
   if (Catalog.includeAudio()) {
     try {
       const audios = await Pages.loadAudioCache();
-      (audios || []).forEach(a => {
-        if (a.active === false) return;
+      for (const g of Catalog.audioGroups(audios)) {
+        if (!g.show) continue;
+        const intro = g.count > 1
+          ? 'Audio complet en ' + g.count + ' chapitres' + (g.minutes ? ' (environ ' + g.minutes + ' min)' : '') + '.'
+          : '';
         items.push({
-          id: 'A' + a.id,
+          id: g.id,
           type: 'audio',
-          title: a.title || '',
-          author: a.language ? 'Audio en ' + a.language : '',
+          title: g.title + ' — version audio',
+          author: g.language ? 'Audio en ' + g.language : 'Version audio',
           category: '',
-          description: a.description || '',
-          price: Number(a.price) || 0,
+          description: [g.description, intro].filter(Boolean).join('\n\n'),
+          price: g.price,
           status: 'disponible',
-          duration: a.duration_seconds ? Math.round(a.duration_seconds / 60) : 0,
-          cover: ''
+          duration: g.minutes || 0,
+          cover: await Catalog.coverFor(g.key)
         });
         audioCount++;
-      });
+      }
     } catch (e) { audioProblem = true; }
   }
   return {
@@ -154,6 +227,28 @@ Pages.catalog = function () {
   const books = [...DB.data.books].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const shown = books.filter(b => b.shop !== false).length;
   const last = s.shopLastGen;
+  let audioBlock = '';
+  if (Catalog.includeAudio()) {
+    if (!Pages.audioCache) {
+      audioBlock = `<button class="btn btn-outline btn-sm mt-8" onclick="Catalog.loadAudios()">🎧 Charger la liste de mes audios</button>`;
+    } else {
+      const groups = Catalog.audioGroups(Pages.audioCache);
+      audioBlock = groups.length ? `
+        <p class="meta mt-8" style="margin-bottom:6px">Les chapitres d'un même livre sont regroupés en <strong>un seul audio</strong> dans la boutique. Le prix par défaut est la somme des chapitres.</p>
+        ${groups.map(g => `
+          <div class="list-item" style="${g.show ? '' : 'opacity:.55'};margin-bottom:8px;flex-wrap:wrap">
+            <input type="checkbox" ${g.show ? 'checked' : ''} onchange="Catalog.toggleAudioGroup('${g.id}', this.checked)" style="width:22px;height:22px;flex-shrink:0">
+            <div class="content" style="min-width:140px">
+              <div class="title">🎧 ${Utils.escapeHtml(g.title)}</div>
+              <div class="meta">${g.count} chapitre(s)${g.minutes ? ' · ' + g.minutes + ' min' : ''} · somme ${Utils.money(g.sum)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+              <input type="number" min="0" value="${g.price}" onchange="Catalog.setAudioPrice('${g.id}', this.value)" style="width:92px;padding:8px;border-radius:8px;border:1.5px solid var(--cream-dark);background:var(--cream)">
+              <span class="meta">${Utils.escapeHtml(DB.data.settings.currency || 'FCFA')}</span>
+            </div>
+          </div>`).join('')}` : `<p class="meta mt-8">Aucun audio trouvé.</p>`;
+    }
+  }
 
   const rows = books.length ? books.map(b => {
     const on = b.shop !== false;
@@ -204,8 +299,9 @@ Pages.catalog = function () {
       </div>
       <div class="stock-row">
         <span>Afficher aussi mes audios</span>
-        <input type="checkbox" ${Catalog.includeAudio() ? 'checked' : ''} onchange="Catalog.saveField('shopIncludeAudio', this.checked)" style="width:22px;height:22px">
+        <input type="checkbox" ${Catalog.includeAudio() ? 'checked' : ''} onchange="Catalog.saveField('shopIncludeAudio', this.checked); Router.render()" style="width:22px;height:22px">
       </div>
+      ${audioBlock}
     </div>
 
     <div class="section-block">
